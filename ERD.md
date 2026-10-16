@@ -13,7 +13,7 @@ Mengingat aplikasi ini adalah *dashboard master tracker*, data disimpan dalam sa
 erDiagram
     PROJECTS {
         uuid id PK "Auto-generated"
-        varchar project_id_pm UK "Primary ID RSO (e.g., 26DPS-SMG001)"
+        varchar project_id_pm UK "Primary ID RSO (e.g., 2023-SJU-SME-001)"
         varchar segment "Fallback to NEW SEGMENT"
         varchar witel "Fallback to WITEL NEW"
         text nama_proyek "Wajib Isi (Init)"
@@ -45,8 +45,8 @@ erDiagram
         integer waktu_penyelesaian_bast "GENERATED: Close - Request"
         text ket_update "NULLABLE"
         varchar status_order "NULLABLE"
-        varchar bulan_bc "NULLABLE"
-        varchar komitmen_bc "NULLABLE"
+        date bulan_bc "NULLABLE"
+        date komitmen_bc "NULLABLE"
         text file_bast "NULLABLE (Teams Link)"
         text file_bapl "NULLABLE (Teams Link)"
         varchar status_gr "NULLABLE"
@@ -57,12 +57,12 @@ erDiagram
 ```
 
 ## 2. Table Definition: `projects`
-**Catatan Nullability**: Sesuai *business requirement*, baris proyek ditambahkan pada fase awal (P8) di mana `Order ID`, `SID`, dan `Tanggal BAST` belum ada. Oleh karena itu, hampir seluruh *field* diizinkan kosong (`NULL`) pada tingkat database.
+**Catatan Nullability**: Sesuai *business requirement*, baris proyek ditambahkan pada fase awal (P8) di mana `Order ID`, `SID`, dan `Tanggal BAST` belum ada. Hampir seluruh *field* diizinkan kosong (`NULL`) pada tingkat database.
 
 | Field Name | PostgreSQL Type | Nullable | Constraint / Validation Rule (Zod / RLS) |
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | No | `DEFAULT gen_random_uuid()` |
-| `project_id_pm` | `VARCHAR(50)` | No | `UNIQUE`. Format: `[Tahun][Segment]-[Witel][Seq]` |
+| `project_id_pm` | `VARCHAR(50)` | No | `UNIQUE`. Format: `[Tahun]-[Witel]-[Segment]-[Auto-Increment/Nomor Baris]` (contoh: `2023-SJU-SME-001`). Angka terakhir diambil dari inkremen otomatis baris di sistem saat operasi penambahan baris. |
 | `segment` | `VARCHAR(50)` | No | Berasal dari `NEW SEGMENT` CSV. |
 | `witel` | `VARCHAR(50)` | No | Berasal dari `WITEL NEW` CSV. |
 | `nama_proyek` | `TEXT` | No | Minimal 3 karakter. |
@@ -81,5 +81,6 @@ erDiagram
 2. **Level Backend/Server Actions (Zod Schema)**: Menerapkan aturan dari `Data Dictionary.csv`:
    - *If-Then Validation*: Menolak form submit jika `Status Dok Delivery = Close` tetapi `Tanggal Close DR` kosong.
    - *Calculated Fields*: Menghitung `Waktu Penyelesaian BAST (hari)` sebelum *INSERT/UPDATE* ke Supabase.
+   - *ID Generation*: Logika pengambilan nomor urut increment (berdasarkan row count atau sequence table) untuk dirangkai menjadi string `[Tahun]-[Witel]-[Segment]-[XXX]` dikelola pada fungsi *Server Action* ketika data baru diinisiasi.
 3. **Level Row Level Security (RLS)**: 
    - `SELECT`, `INSERT`, `UPDATE`, `DELETE` hanya diizinkan untuk session *Authenticated Users* (Pegawai Telkom PM RSO 1).

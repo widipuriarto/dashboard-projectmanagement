@@ -21,6 +21,7 @@ Dokumen ini mendefinisikan aturan mutlak (*strict rules*) yang **WAJIB** dipatuh
 3. **Performance & Security First**: 
    - **Efisiensi Query**: Dilarang melakukan *over-fetching*. Data tabel 38 kolom harus di- *query* dengan paginasi atau optimasi beban klien (TanStack Table).
    - **Keamanan Data**: Wajib memprioritaskan keamanan (*Row Level Security* pada Supabase) dan validasi formulir berlapis (*Client-side* dengan Zod, *Server-side* dengan Server Actions).
+4. **Atomic Design & Granular Execution**: Pembangunan UI (khususnya React) WAJIB mematuhi metodologi *Atomic Design* (Atoms -> Molecules -> Organisms -> Templates -> Pages). Dilarang keras membangun sebuah fitur besar (seperti Navbar/Tabel) secara instan dalam satu file raksasa. Eksekusi harus dilakukan selangkah demi selangkah (membuat atom tombol, merakit molekul form, baru menyusun organisme tabel). *Do NOT rush.*
 
 ## 4. Workflow Execution Protocol
 1. **Sequential Adherence**: Eksekusi harus terstruktur dan berurutan. Dilarang tergesa-gesa menulis kode aplikasi sebelum arsitektur dan fondasi selesai.
@@ -30,3 +31,7 @@ Dokumen ini mendefinisikan aturan mutlak (*strict rules*) yang **WAJIB** dipatuh
 ## 5. Tool Usage & Validations
 - *Agent* diizinkan menggunakan fungsi pembacaan file (CSV, TXT, MD) untuk validasi skema data riil.
 - *Agent* dilarang memberikan *dummy code* yang tidak berfungsi (seperti komentar `// isi logika disini`). Kode yang diserahkan harus bersifat *Production-Ready*.
+
+## 6. Code & Context Management
+1. **No Indonesian Code Comments**: Agent dilarang keras memberikan komentar `//` berbahasa Indonesia di dalam blok kode. Jika komentar memang dibutuhkan secara teknis, WAJIB menggunakan bahasa Inggris profesional. Penjelasan instruksional cukup diletakkan di luar blok kode (di jendela percakapan).
+2. **Periodic Context Refresh**: Setiap setelah beberapa kali interaksi pembuatan/penulisan kode, Agent WAJIB secara mandiri memeriksa ulang dokumen `.md` proyek (`PRD.md`, `Architecture.md`, `Design-System.md`, `task.md`) agar tidak kehilangan konteks, aturan, maupun batas arsitektur proyek.

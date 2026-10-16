@@ -2,7 +2,7 @@
 
 **Project Name**: RSO Area 1 Project Management Dashboard
 **Status**: Approved (MVP Scope Locked)
-**Document Version**: 5.0 (10-Point PM Format + Apple-esque UI)
+**Document Version**: 5.2 (ID Format Update)
 
 ---
 
@@ -26,46 +26,46 @@ Kedua persona di bawah ini **berbagi peran dan hak akses (RBAC) yang identik** d
 
 ## 4. User Stories
 - **Sebagai PM Staff**, saya ingin menambahkan baris proyek baru tanpa harus mengisi *Order ID* atau *SID*, supaya saya bisa melacak inisiasi proyek (tahap P8) sejak hari pertama.
-- **Sebagai Project Manager**, saya ingin melihat visualisasi metrik Pivot, supaya saya tahu berapa proyek yang *Pending Baso* vs *Billing Complete*.
-- **Sebagai Pengguna**, saya ingin mengklik kolom `File BAST`, supaya saya bisa langsung membuka *storage* Microsoft Teams tanpa mencarinya secara manual.
+- **Sebagai Project Manager**, saya ingin melihat visualisasi metrik Pivot saat pertama login, supaya saya langsung tahu berapa proyek yang *Pending Bakso* vs *Billing Complete*.
+- **Sebagai Pengguna**, saya ingin mengklik kolom `File BAST`, supaya saya langsung membuka *storage* Microsoft Teams tanpa mencarinya manual.
 
 ## 5. Daftar Fitur (MVP vs v2)
 **MVP (Rilis Pertama - Saat Ini):**
-- Tab 1: Master Data Table interaktif (38 Kolom standar Data Dictionary) dengan fungsi CRUD penuh.
-- Filter Data, *Global Search*, dan *Column Toggling*, Search berdasarkan kriteria tertentu.
+- Tab 1: Dashboard Analytics (Menampilkan 4 Tabel Pivot/Card sebagai Landing Page utama).
+- Tab 2: Master Data Table interaktif (38 Kolom standar Data Dictionary) dengan fungsi CRUD penuh.
+- Filter Data, *Global Search*, dan *Column Toggling* di dalam tabel.
 - Indikator SLA KPI 7 Hari BAST (Highlight warna).
 - Hyperlink Repo (File BAST & File BAPL).
-- Tab 2: Dashboard Analytics (4 Tabel Pivot/Card).
 
 **v2 (Rilis Berikutnya - Nanti):**
 - Otomasi Telegram Bot untuk dokumen BAPL.
 - Integrasi *Read-Only* API dari server Bima/NCX.
 
 ## 6. Functional Requirement Detail (MVP)
-- **Table CRUD**: UI harus memfasilitasi pembuatan proyek baru, pengeditan sel (update), dan penghapusan baris data. Tabel CRUD berada didalam setiap row.
-- **UI/UX System**: Menerapkan Telkom Corporate Theme x Apple Aesthetics (*Glassmorphism*, *Rounded-2xl*, *Soft Shadows*) menggunakan Shadcn UI dan Tailwind CSS.
+- **Table CRUD**: UI harus memfasilitasi pembuatan proyek baru, pengeditan sel, dan penghapusan baris.
+- **UI/UX System**: Menerapkan Telkom Corporate Theme x Apple Aesthetics (*Glassmorphism*, *Rounded-2xl*, *Soft Shadows*) menggunakan Shadcn UI dan Tailwind.
 - **KPI Formatting**: Jika `Tanggal Close DR` - `Tanggal Request DR` <= 7 hari, tampilkan warna Hijau (`#10B981`). Jika > 7, tampilkan Merah (`#ED1C24`).
-- **Data Mapping Constraint**: Field UI harus memetakan `SEGMENT` dari `NEW SEGMENT`, dan `WITEL` dari `WITEL NEW` (dengan fallback ke nilai lama).
+- **Data Mapping Constraint**: Field UI memetakan `SEGMENT` dari `NEW SEGMENT`, dan `WITEL` dari `WITEL NEW` (fallback ke nilai lama).
+- **Primary Key Auto-Generation**: Kolom `ID PROJECT PM` wajib dihasilkan secara otomatis saat penambahan baris data baru. Format wajib: `[Tahun]-[Witel]-[Segment]-[Auto-Increment/Nomor Baris]` (contoh: `2023-SJU-SME-001`).
 
 ## 7. Sketsa Data Model (Entitas + Field Kunci)
 **Entity: `Projects`** (Tabel Utama)
 - `id` (UUID / Primary Key DB)
-- `project_id_pm` (String, Format RSO Unik: `26DPS-SMG001`)
+- `project_id_pm` (String, Format RSO Unik: `2023-SJU-SME-001`)
 - `segment` & `witel` (String)
 - `nama_proyek`, `nama_mitra`, `nama_pelanggan` (String)
-- `order_id` & `sid` (String, **Nullable** / Diizinkan Kosong)
+- `order_id` & `sid` (String, **Nullable**)
 - `status_delivery_project` & `status_order` (Enum/String)
 - `file_bast` & `file_bapl` (String URL)
 - `tgl_request_dr` & `tgl_close_dr` (Date/Time)
 
 ## 8. Edge Case dan Failure State
-- **Edge Case 1: Proyek Awal Tanpa SID**: Proyek baru inisiasi (P6/P8) tidak akan memiliki `Order ID` dan `SID`. Skema database **wajib melegalkan null** untuk field ini.
-- **Edge Case 2: Data Kosong pada Fallback**: Jika `NEW SEGMENT` dan `SEGMENT` keduanya kosong, sistem menyimpan string "Uncategorized".
+- **Edge Case 1: Proyek Awal Tanpa SID**: Skema database **wajib melegalkan null** untuk field ini.
+- **Edge Case 2: Data Kosong pada Fallback**: Jika `NEW SEGMENT` dan `SEGMENT` kosong, sistem menyimpan string "Uncategorized".
 
 ## 9. Success Metrics
 - 100% operasional pemantauan harian PM berpindah dari Google Sheets ke sistem dashboard.
-- Pengguna dapat melakukan CRUD dan melihat laporan keseluruhan (Monitoring Overview) tanpa hambatan (*zero blocking issues*).
+- Pengguna dapat melakukan CRUD dan melihat laporan keseluruhan tanpa hambatan (*zero blocking issues*).
 
 ## 10. Open Questions
-- *Concurrency*: Karena kolaborasi *real-time* (live socket) ditiadakan, jika 2 user secara tidak sengaja mengedit baris (row) yang **sama** di detik yang **sama**, apakah kita menerapkan *Optimistic Locking* (menolak save user kedua) atau *Last Write Wins* (timpa paksa)? (Jawabannya adalah ini: *Last Write Wins*).
-
+- *Concurrency*: Karena *live socket* ditiadakan, apakah kita menerapkan *Optimistic Locking* atau *Last Write Wins*? (Asumsi: *Last Write Wins*).
