@@ -8,11 +8,13 @@ interface CurrencyInputProps
   prefix?: string;
 }
 
+const numberFormatter = new Intl.NumberFormat("id-ID");
+
 const formatNumberToDisplay = (val?: number | string | null): string => {
   if (val === undefined || val === null || val === "") return "";
   const num = typeof val === "number" ? val : parseFloat(String(val).replace(/\D/g, ""));
   if (isNaN(num)) return "";
-  return new Intl.NumberFormat("id-ID").format(num);
+  return numberFormatter.format(num);
 };
 
 export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputProps>(
@@ -37,7 +39,7 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
       }
 
       const numericVal = parseInt(cleanDigits, 10);
-      setDisplayValue(new Intl.NumberFormat("id-ID").format(numericVal));
+      setDisplayValue(numberFormatter.format(numericVal));
 
       if (onChange) {
         onChange(numericVal);

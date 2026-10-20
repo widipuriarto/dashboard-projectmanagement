@@ -5,15 +5,17 @@ import telkomLogo from "@/assets/logo-telkom.png";
 import { useSidebar } from "@/context/SidebarContext";
 import { cn } from "@/lib/utils";
 
+const MAIN_LINKS: NavLinkData[] = [
+  { label: "Dashboard", href: "/", icon: LayoutDashboard },
+  { label: "Repository", href: "/repository", icon: Database },
+];
+
+const SYSTEM_LINKS: NavLinkData[] = [
+  { label: "Settings", href: "/settings", icon: Settings },
+];
+
 export default function Sidebar() {
   const { isCollapsed, setIsCollapsed, isMobile } = useSidebar();
-
-  const mainLinks: NavLinkData[] = [
-    { label: "Dashboard", href: "/", icon: LayoutDashboard },
-    { label: "Repository", href: "/repository", icon: Database },
-  ];
-
-  const systemLinks: NavLinkData[] = [{ label: "Settings", href: "/settings", icon: Settings }];
 
   return (
     <>
@@ -80,9 +82,9 @@ export default function Sidebar() {
         </div>
 
         <div className="flex flex-1 flex-col overflow-y-auto px-2.5 sm:px-3.5 py-2 pb-6 transition-all duration-300 ease-in-out [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
-          <NavGroup title="Main" links={mainLinks} isCollapsed={isCollapsed} />
+          <NavGroup title="Main" links={MAIN_LINKS} isCollapsed={isCollapsed} />
           <div className="mt-auto w-full">
-            <NavGroup title="System" links={systemLinks} isCollapsed={isCollapsed} />
+            <NavGroup title="System" links={SYSTEM_LINKS} isCollapsed={isCollapsed} />
           </div>
         </div>
       </aside>

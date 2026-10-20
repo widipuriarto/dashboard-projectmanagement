@@ -16,76 +16,13 @@ import {
   STORAGE_KEY_FILTERS,
 } from "@/components/organisms/columns";
 
-const ID_MONTH_ORDER: Record<string, number> = {
-  januari: 1,
-  februari: 2,
-  maret: 3,
-  april: 4,
-  mei: 5,
-  juni: 6,
-  juli: 7,
-  agustus: 8,
-  september: 9,
-  oktober: 10,
-  november: 11,
-  desember: 12,
-};
-
-function parseMonthYearSortKey(str: string): number {
-  if (!str || str === "-") return -1;
-  const parts = str.trim().split(/\s+/);
-  if (parts.length === 2) {
-    const monthNum = ID_MONTH_ORDER[parts[0].toLowerCase()] || 0;
-    const yearNum = parseInt(parts[1], 10);
-    if (!isNaN(yearNum) && monthNum > 0) {
-      return yearNum * 100 + monthNum;
-    }
-  }
-  return 0;
-}
+import { Checkbox } from "@/components/atoms/Checkbox";
+import { parseMonthYearSortKey } from "@/lib/date-constants";
 
 interface DataTableFilterProps<TData> {
   table: Table<TData>;
   className?: string;
   disabled?: boolean;
-}
-
-interface FilterCheckboxProps {
-  checked: boolean;
-  onChange: () => void;
-}
-
-function FilterCheckbox({ checked, onChange }: FilterCheckboxProps) {
-  return (
-    <button
-      type="button"
-      onClick={(e) => {
-        e.stopPropagation();
-        onChange();
-      }}
-      className={cn(
-        "h-4 w-4 rounded-[4px] flex items-center justify-center transition-all shrink-0 cursor-pointer",
-        checked
-          ? "bg-[#1877F2] text-white hover:bg-[#166fe5] shadow-xs"
-          : "border-2 border-slate-300 bg-white hover:border-slate-400"
-      )}
-    >
-      {checked && (
-        <svg
-          className="h-3 w-3 stroke-[3] text-white"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M4.5 12.75l6 6 9-13.5"
-          />
-        </svg>
-      )}
-    </button>
-  );
 }
 
 export function DataTableFilter<TData>({
@@ -271,6 +208,7 @@ export function DataTableFilter<TData>({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger
+        data-testid="filter-button"
         disabled={disabled}
         className={cn(
           buttonVariants({ variant: "outline", size: "lg" }),
@@ -335,6 +273,7 @@ export function DataTableFilter<TData>({
           {activeCategoriesCount > 0 && (
             <button
               type="button"
+              data-testid="filter-reset-all"
               onClick={handleResetAllFilters}
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold text-telkom-red border border-transparent bg-red-50/60 hover:border-telkom-red/40 transition-all cursor-pointer"
               title="Reset all filters"
@@ -356,6 +295,7 @@ export function DataTableFilter<TData>({
               return (
                 <button
                   key={category.id}
+                  data-testid={`filter-category-${category.id}`}
                   type="button"
                   onClick={() => {
                     setActiveCategory(category);
@@ -418,6 +358,7 @@ export function DataTableFilter<TData>({
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
+                  data-testid="filter-select-all"
                   onClick={handleSelectAllCurrent}
                   className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer transition-colors"
                 >
@@ -426,6 +367,7 @@ export function DataTableFilter<TData>({
                 <span className="text-slate-300">|</span>
                 <button
                   type="button"
+                  data-testid="filter-clear-current"
                   onClick={handleClearCurrent}
                   className="text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors"
                 >
@@ -443,13 +385,14 @@ export function DataTableFilter<TData>({
                   return (
                     <div
                       key={opt.value}
+                      data-testid={`filter-option-${opt.value}`}
                       onClick={() => handleToggleOption(opt.value)}
                       className={cn(
                         "group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-700 transition-all cursor-pointer select-none",
                         isChecked ? "bg-slate-50/80" : "hover:bg-slate-100/70"
                       )}
                     >
-                      <FilterCheckbox
+                      <Checkbox
                         checked={isChecked}
                         onChange={() => handleToggleOption(opt.value)}
                       />

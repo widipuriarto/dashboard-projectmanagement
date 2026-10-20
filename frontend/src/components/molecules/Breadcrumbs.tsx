@@ -103,9 +103,9 @@ export default function Breadcrumbs() {
                   </span>
                 ) : (
                   <Link
-                    to={item.href}
+                    to={item.href || "#"}
                     onClick={(e) => {
-                      if (!confirmNavigation(item.href)) {
+                      if (item.href && !confirmNavigation(item.href)) {
                         e.preventDefault();
                       }
                     }}

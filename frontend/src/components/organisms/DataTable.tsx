@@ -4,6 +4,7 @@ import {
   type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
+  type Row,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -31,6 +32,8 @@ import {
   STORAGE_KEY_VISIBILITY,
   STORAGE_KEY_ORDER,
   STORAGE_KEY_FILTERS,
+  STORAGE_KEY_SORTING,
+  idrCurrencyFormatter,
 } from "./columns";
 
 const LOCKED_COLUMNS = ["actions", "nomor"];
@@ -63,14 +66,9 @@ export const customGlobalFilterFn = (
   const strVal = String(rawVal).toLowerCase();
   if (strVal.includes(query)) return true;
 
-  // Special case: Rupiah formatted currency for nilai_kontrak_obl
+  // Special case: Rupiah formatted currency for nilai_kontrak_obl using singleton formatter
   if (columnId === "nilai_kontrak_obl" && typeof rawVal === "number") {
-    const formatted = new Intl.NumberFormat("id-ID", {
-      style: "currency",
-      currency: "IDR",
-    })
-      .format(rawVal)
-      .toLowerCase();
+    const formatted = idrCurrencyFormatter.format(rawVal).toLowerCase();
     if (formatted.includes(query)) return true;
   }
 
@@ -83,9 +81,85 @@ interface DataTableProps<TData, TValue> {
   actionSlot?: React.ReactNode;
   isLoading?: boolean;
   isCreateMode?: boolean;
+  isFormMode?: boolean;
   createFormSlot?: React.ReactNode;
   highlightedRowId?: string | null;
+  onEdit?: (row: TData) => void;
+  onDelete?: (row: TData) => void;
 }
+
+interface VirtualTableRowProps<TData> {
+  row: Row<TData>;
+  virtualRowIndex: number;
+  isRowHighlighted: boolean;
+  lastPinnedId: string | undefined;
+  isScrolledX: boolean;
+  columnsSignature: string;
+}
+
+const VirtualTableRow = React.memo(
+  function VirtualTableRow<TData>({
+    row,
+    virtualRowIndex,
+    isRowHighlighted,
+    lastPinnedId,
+    isScrolledX,
+  }: VirtualTableRowProps<TData>) {
+    return (
+      <TableRow
+        data-testid="table-row"
+        data-index={virtualRowIndex}
+        data-state={row.getIsSelected() && "selected"}
+        className={cn(
+          "group h-11",
+          isRowHighlighted && "bg-sky-50/90 font-medium transition-colors duration-700"
+        )}
+      >
+        {row.getVisibleCells().map((cell) => {
+          const isPinned = LOCKED_COLUMNS.includes(cell.column.id);
+          const isLastPinned = cell.column.id === lastPinnedId;
+
+          return (
+            <TableCell
+              key={cell.id}
+              className={cn(
+                "py-1.5 px-3 overflow-hidden text-ellipsis whitespace-nowrap border-b border-slate-100",
+                isRowHighlighted
+                  ? isPinned
+                    ? "sticky z-10 bg-sky-50 text-sky-950 font-semibold transition-colors duration-700"
+                    : "bg-sky-50/90 text-sky-950 font-medium transition-colors duration-700"
+                  : isPinned
+                  ? "sticky z-10 bg-white text-slate-700 group-hover:bg-slate-50"
+                  : "bg-white text-slate-700 group-hover:bg-slate-50",
+                isScrolledX && isLastPinned && "shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]"
+              )}
+              style={{
+                width: cell.column.getSize(),
+                left: isPinned ? `${cell.column.getStart()}px` : undefined,
+              }}
+            >
+              {cell.column.id === "nomor" ? (
+                <div className="text-center font-medium">{virtualRowIndex + 1}</div>
+              ) : (
+                flexRender(cell.column.columnDef.cell, cell.getContext())
+              )}
+            </TableCell>
+          );
+        })}
+      </TableRow>
+    );
+  },
+  (prev, next) => {
+    return (
+      prev.row.original === next.row.original &&
+      prev.virtualRowIndex === next.virtualRowIndex &&
+      prev.isRowHighlighted === next.isRowHighlighted &&
+      prev.lastPinnedId === next.lastPinnedId &&
+      prev.isScrolledX === next.isScrolledX &&
+      prev.columnsSignature === next.columnsSignature
+    );
+  }
+) as <TData>(props: VirtualTableRowProps<TData>) => React.ReactElement;
 
 export function DataTable<TData, TValue>({
   columns,
@@ -93,10 +167,34 @@ export function DataTable<TData, TValue>({
   actionSlot,
   isLoading = false,
   isCreateMode = false,
+  isFormMode,
   createFormSlot,
   highlightedRowId = null,
+  onEdit,
+  onDelete,
 }: DataTableProps<TData, TValue>) {
-  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const isFormActive = isFormMode ?? isCreateMode;
+  const [sorting, setSorting] = React.useState<SortingState>(() => {
+    const defaultSort: SortingState = [{ id: "project_id_pm", desc: false }];
+    if (typeof window === "undefined") return defaultSort;
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SORTING);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          return parsed.filter(
+            (item) =>
+              item &&
+              typeof item.id === "string" &&
+              typeof item.desc === "boolean"
+          );
+        }
+      }
+    } catch (e) {
+      console.error("Failed to parse sorting state from localStorage", e);
+    }
+    return defaultSort;
+  });
   const [globalFilter, setGlobalFilter] = React.useState<any>(undefined);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(() => {
     if (typeof window === "undefined") return [];
@@ -168,9 +266,32 @@ export function DataTable<TData, TValue>({
   const table = useReactTable({
     data,
     columns,
+    meta: {
+      onEdit,
+      onDelete,
+    },
     globalFilterFn: customGlobalFilterFn,
     getCoreRowModel: getCoreRowModel(),
-    onSortingChange: setSorting,
+    onSortingChange: (updater) => {
+      setSorting((prev) => {
+        const next = typeof updater === "function" ? updater(prev) : updater;
+        const sanitized = Array.isArray(next)
+          ? next.filter(
+              (s) => s && typeof s.id === "string" && typeof s.desc === "boolean"
+            )
+          : [];
+        try {
+          if (sanitized.length > 0) {
+            localStorage.setItem(STORAGE_KEY_SORTING, JSON.stringify(sanitized));
+          } else {
+            localStorage.removeItem(STORAGE_KEY_SORTING);
+          }
+        } catch (e) {
+          console.error("Failed to save sorting state to localStorage", e);
+        }
+        return sanitized;
+      });
+    },
     getSortedRowModel: getSortedRowModel(),
     onGlobalFilterChange: setGlobalFilter,
     getFilteredRowModel: getFilteredRowModel(),
@@ -246,13 +367,24 @@ export function DataTable<TData, TValue>({
     const el = parentRef.current;
     if (!el) return;
 
+    let rAFId: number | null = null;
     const handleScroll = () => {
-      const scrolled = el.scrollLeft > 2;
-      setIsScrolledX((prev) => (prev !== scrolled ? scrolled : prev));
+      if (rAFId === null) {
+        rAFId = window.requestAnimationFrame(() => {
+          const scrolled = el.scrollLeft > 2;
+          setIsScrolledX((prev) => (prev !== scrolled ? scrolled : prev));
+          rAFId = null;
+        });
+      }
     };
 
     el.addEventListener("scroll", handleScroll, { passive: true });
-    return () => el.removeEventListener("scroll", handleScroll);
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      if (rAFId !== null) {
+        window.cancelAnimationFrame(rAFId);
+      }
+    };
   }, []);
 
   const lastPinnedId = React.useMemo(() => {
@@ -267,12 +399,12 @@ export function DataTable<TData, TValue>({
     count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 44,
-    overscan: 20,
+    overscan: 3,
   });
 
-  // Smoothly auto-scroll to highlighted newly-added row
+  // Smoothly auto-scroll to highlighted newly-added or edited row
   React.useEffect(() => {
-    if (!isCreateMode && highlightedRowId && rows.length > 0) {
+    if (!isFormActive && highlightedRowId && rows.length > 0) {
       const targetIndex = rows.findIndex(
         (r) => (r.original as any)?.project_id_pm === highlightedRowId
       );
@@ -286,10 +418,21 @@ export function DataTable<TData, TValue>({
         return () => clearTimeout(timeoutId);
       }
     }
-  }, [isCreateMode, highlightedRowId, rows, rowVirtualizer]);
+  }, [isFormActive, highlightedRowId, rows, rowVirtualizer]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
+
+  const columnsSignature = React.useMemo(() => {
+    return table
+      .getVisibleLeafColumns()
+      .map((c) => `${c.id}:${c.getSize()}`)
+      .join(",");
+  }, [
+    table.getState().columnOrder,
+    table.getState().columnVisibility,
+    table.getState().columnSizing,
+  ]);
 
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
   const paddingBottom = virtualRows.length > 0
@@ -306,25 +449,25 @@ export function DataTable<TData, TValue>({
             {actionSlot}
           </div>
           <div className="w-full md:hidden">
-            <DataTableFilter table={table} className="w-full" disabled={isCreateMode} />
+            <DataTableFilter table={table} className="w-full" disabled={isFormActive} />
           </div>
           <div className="w-full md:hidden">
-            <DataTableViewOptions table={table} className="w-full" disabled={isCreateMode} />
+            <DataTableViewOptions table={table} className="w-full" disabled={isFormActive} />
           </div>
         </div>
 
         {/* Search Bar (Full-width on mobile row 2) & Desktop Controls (Search + Filter + Columns) */}
         <div className="flex flex-col md:flex-row items-center gap-2.5 md:gap-3 w-full md:w-auto">
-          <DataTableSearchInput table={table} className="w-full md:w-[420px]" disabled={isCreateMode} />
+          <DataTableSearchInput table={table} className="w-full md:w-[420px]" disabled={isFormActive} />
           <div className="hidden md:flex items-center gap-3">
-            <DataTableFilter table={table} disabled={isCreateMode} />
-            <DataTableViewOptions table={table} disabled={isCreateMode} />
+            <DataTableFilter table={table} disabled={isFormActive} />
+            <DataTableViewOptions table={table} disabled={isFormActive} />
           </div>
         </div>
       </div>
 
       {/* Active Filter Chips / Pills */}
-      {!isCreateMode && columnFilters.length > 0 && (
+      {!isFormActive && columnFilters.length > 0 && (
         <div className="flex items-start justify-end gap-2.5 -mt-2 pt-0.5 w-full">
           {/* Left Column: Filter chips that wrap without intruding under Clear all */}
           <div className="flex flex-wrap items-center justify-end gap-1.5 flex-1 min-w-0">
@@ -368,6 +511,7 @@ export function DataTable<TData, TValue>({
             <span className="text-slate-300 text-xs select-none leading-none">|</span>
             <button
               type="button"
+              data-testid="clear-all-filters"
               onClick={() => table.resetColumnFilters()}
               className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-telkom-red border border-transparent bg-red-50/60 hover:border-telkom-red/40 transition-all cursor-pointer"
               title="Clear all active filters"
@@ -383,12 +527,14 @@ export function DataTable<TData, TValue>({
       <div 
         className="rounded-lg border border-slate-200 bg-white shadow-sm flex-1 min-h-0 w-full relative overflow-hidden flex flex-col isolate"
       >
-        {isCreateMode && createFormSlot ? (
+        {isFormActive && createFormSlot ? (
           createFormSlot
         ) : (
           <div
             ref={parentRef}
+            data-testid="table-scroll-container"
             className="w-full h-full overflow-auto hide-scrollbar"
+            style={{ willChange: "scroll-position" }}
           >
             <table className="w-full caption-bottom text-sm border-separate border-spacing-0" style={{ width: table.getTotalSize(), tableLayout: 'fixed' }}>
           <TableHeader className="bg-slate-100 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
@@ -501,50 +647,15 @@ export function DataTable<TData, TValue>({
                     (row.original as any)?.project_id_pm === highlightedRowId;
 
                   return (
-                    <TableRow
+                    <VirtualTableRow
                       key={row.id}
-                      data-index={virtualRow.index}
-                      data-state={row.getIsSelected() && "selected"}
-                      className={cn(
-                        "group h-11 transition-colors duration-700",
-                        isRowHighlighted && "bg-sky-50/90 font-medium"
-                      )}
-                    >
-                      {row.getVisibleCells().map((cell) => {
-                        const isPinned = LOCKED_COLUMNS.includes(cell.column.id);
-                        const isLastPinned = cell.column.id === lastPinnedId;
-
-                        return (
-                          <TableCell 
-                            key={cell.id} 
-                            className={cn(
-                              "py-1.5 px-3 overflow-hidden text-ellipsis whitespace-nowrap transition-colors duration-700 border-b",
-                              isRowHighlighted
-                                ? isPinned
-                                  ? "sticky z-10 bg-sky-50 text-sky-950 font-semibold border-sky-200"
-                                  : "bg-sky-50/90 text-sky-950 font-medium border-sky-200"
-                                : isPinned
-                                ? "sticky z-10 bg-white text-slate-700 group-hover:bg-slate-50 border-slate-100"
-                                : "bg-white text-slate-700 group-hover:bg-slate-50 border-slate-100",
-                              isScrolledX && isLastPinned && "shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]"
-                            )}
-                            style={{ 
-                              width: cell.column.getSize(),
-                              left: isPinned ? `${cell.column.getStart()}px` : undefined,
-                            }}
-                          >
-                            {cell.column.id === "nomor" ? (
-                              <div className="text-center font-medium">{virtualRow.index + 1}</div>
-                            ) : (
-                              flexRender(
-                                cell.column.columnDef.cell,
-                                cell.getContext()
-                              )
-                            )}
-                          </TableCell>
-                        );
-                      })}
-                    </TableRow>
+                      row={row}
+                      virtualRowIndex={virtualRow.index}
+                      isRowHighlighted={isRowHighlighted}
+                      lastPinnedId={lastPinnedId}
+                      isScrolledX={isScrolledX}
+                      columnsSignature={columnsSignature}
+                    />
                   );
                 })}
                 {paddingBottom > 0 && (
@@ -556,6 +667,7 @@ export function DataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
+                  data-testid="table-empty-state"
                   colSpan={columns.length}
                   className="h-32 text-center text-slate-500"
                 >

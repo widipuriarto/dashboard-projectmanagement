@@ -104,6 +104,7 @@ export function DataTableSearchInput<TData>({
       {/* Column Selector Popover Trigger */}
       <Popover open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
         <PopoverTrigger
+          data-testid="search-column-dropdown"
           className={cn(
             "inline-flex items-center gap-1.5 h-7 px-2.5 mx-1 rounded-md text-xs font-semibold cursor-pointer select-none transition-all shrink-0 outline-none",
             disabled
@@ -149,6 +150,7 @@ export function DataTableSearchInput<TData>({
             {/* Option: All Columns */}
             <button
               type="button"
+              data-testid="search-column-all"
               onClick={() => {
                 setTargetColumn("all");
                 setIsDropdownOpen(false);
@@ -175,6 +177,7 @@ export function DataTableSearchInput<TData>({
               return (
                 <button
                   key={col.id}
+                  data-testid={`search-column-${col.id}`}
                   type="button"
                   onClick={() => {
                     setTargetColumn(col.id);
@@ -212,6 +215,7 @@ export function DataTableSearchInput<TData>({
       <input
         ref={inputRef}
         type="text"
+        data-testid="search-input"
         disabled={disabled}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
@@ -240,6 +244,7 @@ export function DataTableSearchInput<TData>({
       {query && (
         <button
           type="button"
+          data-testid="search-clear-button"
           onClick={() => {
             setQuery("");
             inputRef.current?.focus();

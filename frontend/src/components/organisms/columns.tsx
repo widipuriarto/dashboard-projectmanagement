@@ -1,4 +1,3 @@
-import * as React from "react";
 import type { ColumnDef } from "@tanstack/react-table";
 import { StatusBadge } from "@/components/atoms/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,33 @@ import { MicrosoftTeamsIcon } from "@/components/atoms/MicrosoftTeamsIcon";
 import { cn } from "@/lib/utils";
 
 export type ProjectPM = Record<string, any>;
+
+// Top-level singleton formatters to prevent garbage collection pauses during virtual scrolling
+export const idrCurrencyFormatter = new Intl.NumberFormat("id-ID", {
+  style: "currency",
+  currency: "IDR",
+  maximumFractionDigits: 0,
+});
+
+export const monthYearFormatter = new Intl.DateTimeFormat("id-ID", {
+  month: "long",
+  year: "numeric",
+});
+
+export const dateTimeFormatter = new Intl.DateTimeFormat("id-ID", {
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+
+export const formatDateTime = (val?: string | null): string => {
+  if (!val) return "-";
+  const date = new Date(val);
+  if (isNaN(date.getTime())) return String(val);
+  return dateTimeFormatter.format(date);
+};
 
 const formatMonthYear = (val?: string | null) => {
   if (!val) return <span className="text-slate-400">-</span>;
@@ -17,7 +43,7 @@ const formatMonthYear = (val?: string | null) => {
     const date = new Date(year, month, 1);
     return (
       <span className="font-medium text-slate-700">
-        {new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(date)}
+        {monthYearFormatter.format(date)}
       </span>
     );
   }
@@ -25,16 +51,20 @@ const formatMonthYear = (val?: string | null) => {
   if (isNaN(date.getTime())) return <span>{val}</span>;
   return (
     <span className="font-medium text-slate-700">
-      {new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(date)}
+      {monthYearFormatter.format(date)}
     </span>
   );
 };
+
 
 export const MANDATORY_COLUMN_IDS = ["actions", "nomor", "project_id_pm"] as const;
 
 export const STORAGE_KEY_VISIBILITY = "pm_rso1_column_visibility";
 export const STORAGE_KEY_ORDER = "pm_rso1_column_order";
 export const STORAGE_KEY_FILTERS = "pm_rso1_column_filters";
+export const STORAGE_KEY_SORTING = "pm_rso1_column_sorting";
+export const STORAGE_KEY_HIGHEST_SEQ = "pm_rso1_highest_project_seq";
+export const STORAGE_KEY_HIGHEST_NOMOR = "pm_rso1_highest_nomor";
 
 export const COLUMN_DISPLAY_TITLES: Record<string, string> = {
   actions: "Aksi",
@@ -150,11 +180,11 @@ export const formatMonthYearKey = (val?: string | null): string => {
     const year = parseInt(match[1], 10);
     const month = parseInt(match[2], 10) - 1;
     const date = new Date(year, month, 1);
-    return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(date);
+    return monthYearFormatter.format(date);
   }
   const date = new Date(val);
   if (isNaN(date.getTime())) return String(val).trim() || "-";
-  return new Intl.DateTimeFormat("id-ID", { month: "long", year: "numeric" }).format(date);
+  return monthYearFormatter.format(date);
 };
 
 export const monthYearFilterFn = (
@@ -217,6 +247,7 @@ export function ProjectIdSortHeader({ column }: { column: any }) {
     <div className="relative flex items-center justify-center w-full min-h-[26px]">
       <button
         type="button"
+        data-testid="sort-project-id"
         onClick={handleToggle}
         className={cn(
           "absolute -left-2.5 top-1/2 -translate-y-1/2 h-6.5 w-6.5 inline-flex items-center justify-center rounded-md transition-all cursor-pointer select-none outline-none",
@@ -244,21 +275,41 @@ export function ProjectIdSortHeader({ column }: { column: any }) {
   );
 }
 
+export interface ProjectTableMeta {
+  onEdit?: (project: ProjectPM) => void;
+  onDelete?: (project: ProjectPM) => void;
+}
+
 export const columns: ColumnDef<ProjectPM>[] = [
   {
     id: "actions",
     enableHiding: false,
     header: () => <div className="text-center">Aksi</div>,
-    cell: () => (
-      <div className="flex items-center gap-2">
-        <Button variant="ghost" className="h-8 w-8 p-0 rounded-md cursor-pointer text-blue-500 hover:text-blue-700 hover:bg-blue-100 transition-colors">
-          <Edit className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" className="h-8 w-8 p-0 rounded-md cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-100 transition-colors">
-          <Trash2 className="h-4 w-4" />
-        </Button>
-      </div>
-    ),
+    cell: ({ row, table }) => {
+      const meta = table.options.meta as ProjectTableMeta | undefined;
+      return (
+        <div className="flex items-center gap-2">
+          <Button
+            data-testid="row-actions-edit"
+            variant="ghost"
+            className="h-8 w-8 p-0 rounded-md cursor-pointer text-blue-500 hover:text-blue-700 hover:bg-blue-100 transition-colors"
+            onClick={() => meta?.onEdit?.(row.original)}
+            title="Edit Proyek"
+          >
+            <Edit className="h-4 w-4" />
+          </Button>
+          <Button
+            data-testid="row-actions-delete"
+            variant="ghost"
+            className="h-8 w-8 p-0 rounded-md cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-100 transition-colors"
+            onClick={() => meta?.onDelete?.(row.original)}
+            title="Hapus Proyek"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
+      );
+    },
     size: 100,
   },
   {
@@ -354,7 +405,7 @@ export const columns: ColumnDef<ProjectPM>[] = [
       const val = row.getValue("nilai_kontrak_obl") as number;
       return (
         <div className="text-right font-medium">
-          {val ? new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR" }).format(val) : "-"}
+          {val ? idrCurrencyFormatter.format(val) : "-"}
         </div>
       );
     },
@@ -663,20 +714,12 @@ export const columns: ColumnDef<ProjectPM>[] = [
     accessorKey: "created_at",
     header: "Created At",
     size: 200,
-    cell: ({ row }) => {
-      const val = row.getValue("created_at") as string;
-      if (!val) return "-";
-      return new Date(val).toLocaleString("id-ID", { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    }
+    cell: ({ row }) => formatDateTime(row.getValue("created_at") as string),
   },
   {
     accessorKey: "updated_at",
     header: "Updated At",
     size: 200,
-    cell: ({ row }) => {
-      const val = row.getValue("updated_at") as string;
-      if (!val) return "-";
-      return new Date(val).toLocaleString("id-ID", { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-    }
+    cell: ({ row }) => formatDateTime(row.getValue("updated_at") as string),
   },
 ];

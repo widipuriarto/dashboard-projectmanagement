@@ -21,6 +21,7 @@ export interface CustomSelectProps {
   disabled?: boolean;
   error?: string;
   className?: string;
+  "data-testid"?: string;
 }
 
 export function CustomSelect({
@@ -31,6 +32,7 @@ export function CustomSelect({
   disabled = false,
   error,
   className,
+  "data-testid": testId,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
   const [highlightedIndex, setHighlightedIndex] = React.useState<number>(-1);
@@ -148,6 +150,7 @@ export function CustomSelect({
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger
         ref={triggerRef}
+        data-testid={testId}
         disabled={disabled}
         type="button"
         onKeyDown={handleKeyDown}
@@ -192,6 +195,7 @@ export function CustomSelect({
           return (
             <button
               key={opt.value}
+              data-testid={`select-option-${opt.value}`}
               ref={(el) => {
                 optionsRef.current[idx] = el;
               }}

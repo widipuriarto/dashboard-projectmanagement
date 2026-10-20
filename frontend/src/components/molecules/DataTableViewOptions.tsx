@@ -21,47 +21,7 @@ interface DataTableViewOptionsProps<TData> {
   disabled?: boolean;
 }
 
-interface ColumnCheckboxProps {
-  checked: boolean;
-  disabled?: boolean;
-  onChange?: () => void;
-}
-
-function ColumnCheckbox({ checked, disabled = false, onChange }: ColumnCheckboxProps) {
-  return (
-    <button
-      type="button"
-      disabled={disabled}
-      onClick={(e) => {
-        e.stopPropagation();
-        if (!disabled && onChange) onChange();
-      }}
-      className={cn(
-        "h-4 w-4 rounded-[4px] flex items-center justify-center transition-all shrink-0",
-        disabled
-          ? "bg-slate-200 text-white cursor-not-allowed"
-          : checked
-          ? "bg-[#1877F2] text-white hover:bg-[#166fe5] cursor-pointer shadow-xs"
-          : "border-2 border-slate-300 bg-white hover:border-slate-400 cursor-pointer"
-      )}
-    >
-      {(checked || disabled) && (
-        <svg
-          className="h-3 w-3 stroke-[3] text-white"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-        >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M4.5 12.75l6 6 9-13.5"
-          />
-        </svg>
-      )}
-    </button>
-  );
-}
+import { Checkbox } from "@/components/atoms/Checkbox";
 
 export function DataTableViewOptions<TData>({
   table,
@@ -74,6 +34,7 @@ export function DataTableViewOptions<TData>({
   const [dragOverColId, setDragOverColId] = React.useState<string | null>(null);
   const [dropPosition, setDropPosition] = React.useState<"top" | "bottom" | null>(null);
   const isDraggingRef = React.useRef(false);
+  const scrollContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Retrieve current column order and visibility from table state
   const columnOrder = table.getState().columnOrder;
@@ -141,14 +102,34 @@ export function DataTableViewOptions<TData>({
   // Checked: moves to the bottom of checked columns (under previously checked)
   // Unchecked: moves to the row immediately below the checked columns (NOT all the way to the bottom)
   const handleToggleColumn = (column: (typeof allColumns)[0]) => {
+    // 1. Blur currently focused element to prevent browser auto-scrolling to repositioned node
+    if (typeof document !== "undefined" && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
+
+    const container = scrollContainerRef.current;
+    const prevScrollTop = container ? container.scrollTop : 0;
+
+    // 2. Identify the anchor element to keep the view firmly in place
+    const currentReorderableIds = reorderableCols.map((c) => c.id);
+    const colIndex = currentReorderableIds.indexOf(column.id);
+    const anchorId = currentReorderableIds[colIndex + 1] || currentReorderableIds[colIndex - 1];
+
+    let prevAnchorTop = 0;
+    if (container && anchorId) {
+      const anchorEl = container.querySelector(
+        `[data-testid="column-item-${anchorId}"]`
+      ) as HTMLElement | null;
+      if (anchorEl) {
+        prevAnchorTop = anchorEl.getBoundingClientRect().top;
+      }
+    }
+
     const isCurrentlyChecked = isColVisible(column.id);
     const willBeChecked = !isCurrentlyChecked;
 
     // Toggle column visibility in TanStack table
     column.toggleVisibility(willBeChecked);
-
-    // Current non-mandatory column IDs in current order
-    const currentReorderableIds = reorderableCols.map((c) => c.id);
 
     // Separate other checked and unchecked columns excluding the current column
     const checkedIds = currentReorderableIds.filter(
@@ -173,6 +154,23 @@ export function DataTableViewOptions<TData>({
     } catch (e) {
       console.error(e);
     }
+
+    // 3. Keep scroll position firmly anchored so the user's viewport never jumps away
+    requestAnimationFrame(() => {
+      if (!container) return;
+      if (anchorId) {
+        const anchorEl = container.querySelector(
+          `[data-testid="column-item-${anchorId}"]`
+        ) as HTMLElement | null;
+        if (anchorEl && prevAnchorTop) {
+          const newAnchorTop = anchorEl.getBoundingClientRect().top;
+          const delta = newAnchorTop - prevAnchorTop;
+          container.scrollTop = prevScrollTop + delta;
+          return;
+        }
+      }
+      container.scrollTop = prevScrollTop;
+    });
   };
 
   const handleRowClick = (column: (typeof allColumns)[0]) => {
@@ -321,6 +319,7 @@ export function DataTableViewOptions<TData>({
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger
+        data-testid="columns-button"
         disabled={disabled}
         className={cn(
           buttonVariants({ variant: "outline", size: "lg" }),
@@ -389,6 +388,7 @@ export function DataTableViewOptions<TData>({
           <div className="flex items-center gap-1.5">
             <button
               type="button"
+              data-testid="columns-show-all"
               onClick={handleShowAll}
               className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer transition-colors px-1"
             >
@@ -397,6 +397,7 @@ export function DataTableViewOptions<TData>({
             <span className="text-slate-300">|</span>
             <button
               type="button"
+              data-testid="columns-hide-all"
               onClick={handleHideAll}
               className="text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors px-1"
             >
@@ -405,6 +406,7 @@ export function DataTableViewOptions<TData>({
             <span className="text-slate-300">|</span>
             <button
               type="button"
+              data-testid="columns-reset"
               onClick={handleResetDefault}
               className="text-slate-500 hover:text-telkom-navy font-medium cursor-pointer transition-colors px-1"
               title="Reset columns and order to default"
@@ -415,7 +417,10 @@ export function DataTableViewOptions<TData>({
         </div>
 
         {/* Scrollable Column List with Hidden Scrollbar */}
-        <div className="max-h-[320px] overflow-y-auto space-y-0.5 divide-y-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+        <div
+          ref={scrollContainerRef}
+          className="max-h-[320px] overflow-y-auto space-y-0.5 divide-y-0 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+        >
           {/* Mandatory / Locked Columns Section (Clean background without gray shade) */}
           {!searchQuery && mandatoryCols.length > 0 && (
             <div className="space-y-0.5 pb-1 mb-1 border-b border-slate-100">
@@ -424,10 +429,11 @@ export function DataTableViewOptions<TData>({
                 return (
                   <div
                     key={column.id}
+                    data-testid={`column-mandatory-${column.id}`}
                     className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-500 cursor-default select-none"
                     title="Mandatory column (cannot be hidden or reordered)"
                   >
-                    <ColumnCheckbox checked={true} disabled={true} />
+                    <Checkbox checked={true} disabled={true} />
                     <span className="text-xs font-medium text-slate-600 flex-1 truncate">
                       {label}
                     </span>
@@ -451,6 +457,7 @@ export function DataTableViewOptions<TData>({
               return (
                 <div
                   key={column.id}
+                  data-testid={`column-item-${column.id}`}
                   draggable={canDrag}
                   onDragStart={(e) => canDrag && handleDragStart(e, column.id)}
                   onDragOver={(e) => canDrag && handleDragOver(e, column.id)}
@@ -472,7 +479,7 @@ export function DataTableViewOptions<TData>({
                     <div className="absolute -bottom-0.5 left-2 right-2 h-[2px] bg-telkom-navy rounded-full z-10 pointer-events-none" />
                   )}
 
-                  <ColumnCheckbox
+                  <Checkbox
                     checked={isChecked}
                     onChange={() => handleToggleColumn(column)}
                   />
