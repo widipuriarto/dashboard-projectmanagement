@@ -59,6 +59,19 @@ const formatMonthYear = (val?: string | null) => {
 
 export const MANDATORY_COLUMN_IDS = ["actions", "nomor", "project_id_pm"] as const;
 
+export const OVERFLOW_ENABLED_COLUMN_IDS = [
+  "nama_proyek",
+  "nama_mitra",
+  "nama_pelanggan",
+  "idlop",
+  "nomor_kl_sp_wo_nopes",
+  "note_email_handover",
+  "no_bast_telkom",
+  "ket_update",
+] as const;
+
+export const OVERFLOW_POPOVER_COLUMN_IDS = OVERFLOW_ENABLED_COLUMN_IDS;
+
 export const STORAGE_KEY_VISIBILITY = "pm_rso1_column_visibility";
 export const STORAGE_KEY_ORDER = "pm_rso1_column_order";
 export const STORAGE_KEY_FILTERS = "pm_rso1_column_filters";

@@ -32,7 +32,6 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
           placeholder="Nomor ID Digireview..."
           value={formData.id_digireview}
           onChange={(e) => updateField("id_digireview", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -42,7 +41,6 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
           placeholder="Contoh: Tel.7165/LG320/DR4-1D100000/2023"
           value={formData.no_bast_telkom}
           onChange={(e) => updateField("no_bast_telkom", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -68,7 +66,7 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
           type="text"
           readOnly
           value={liveSlaDays}
-          className="bg-slate-50 text-slate-700 font-medium cursor-not-allowed border-slate-200"
+          className="bg-slate-50 text-slate-700 font-medium cursor-not-allowed border-slate-400"
         />
       </FormField>
 
@@ -100,7 +98,6 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
               e.target.value ? parseInt(e.target.value, 10) : null
             )
           }
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
     </FormSection>

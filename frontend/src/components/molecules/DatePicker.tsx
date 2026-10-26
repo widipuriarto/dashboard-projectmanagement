@@ -143,12 +143,12 @@ export function DatePicker({
         disabled={disabled}
         type="button"
         className={cn(
-          "w-full h-10 px-3 rounded-lg border bg-white text-sm shadow-2xs transition-all flex items-center justify-between text-left outline-none select-none cursor-pointer group",
+          "w-full h-10 px-3 rounded-lg border bg-white text-sm transition-all flex items-center justify-between text-left outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0 select-none cursor-pointer group",
           error
-            ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/15"
+            ? "border-red-400 focus:border-red-500"
             : isOpen
-            ? "border-telkom-navy ring-2 ring-telkom-navy/15"
-            : "border-slate-200 hover:border-slate-300 focus:border-telkom-navy focus:ring-2 focus:ring-telkom-navy/15",
+            ? "border-telkom-navy ring-0 outline-none"
+            : "border-slate-400 hover:border-slate-500 focus:border-telkom-navy",
           disabled && "bg-slate-50 opacity-60 cursor-not-allowed pointer-events-none",
           className
         )}
@@ -181,7 +181,7 @@ export function DatePicker({
         align="start"
         side="bottom"
         sideOffset={6}
-        className="w-[280px] sm:w-[300px] p-3 rounded-2xl border border-slate-200/90 bg-white shadow-xl z-50 duration-150"
+        className="w-[280px] sm:w-[300px] p-3 rounded-2xl border-none bg-white shadow-xl z-50 duration-150"
       >
         {/* Calendar Header with Month/Year Navigation */}
         <div className="flex items-center justify-between mb-3 px-1">

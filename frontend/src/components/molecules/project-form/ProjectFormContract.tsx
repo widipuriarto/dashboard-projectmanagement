@@ -35,7 +35,7 @@ export const ProjectFormContract = React.memo(function ProjectFormContract({
           value={formData.status_email_handover}
           onChange={(val) => updateField("status_email_handover", val)}
           options={["OK", "NOK"]}
-          placeholder="Pilih Status..."
+          placeholder="Pilih Status Email Handover..."
           error={errors.status_email_handover}
         />
       </FormField>
@@ -68,7 +68,6 @@ export const ProjectFormContract = React.memo(function ProjectFormContract({
           placeholder="Contoh: TEL.4720/LG.270/DR4-1D000000/2023"
           value={formData.nomor_kl_sp_wo_nopes}
           onChange={(e) => updateField("nomor_kl_sp_wo_nopes", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -96,7 +95,6 @@ export const ProjectFormContract = React.memo(function ProjectFormContract({
           placeholder="Contoh: 1-37841806771"
           value={formData.quote_number}
           onChange={(e) => updateField("quote_number", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -107,7 +105,6 @@ export const ProjectFormContract = React.memo(function ProjectFormContract({
           placeholder="Catatan tambahan email by..."
           value={formData.note_email_handover}
           onChange={(e) => updateField("note_email_handover", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
     </FormSection>

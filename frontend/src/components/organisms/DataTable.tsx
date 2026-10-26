@@ -22,12 +22,19 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Button } from "@/components/ui/button";
 import { DataTableFilter } from "@/components/molecules/DataTableFilter";
 import { DataTableViewOptions } from "@/components/molecules/DataTableViewOptions";
 import { DataTableSearchInput } from "@/components/molecules/DataTableSearchInput";
+import { DataTableExport } from "@/components/molecules/DataTableExport";
+import {
+  CellOverflowPopover,
+  type CellOverflowData,
+} from "@/components/molecules/CellOverflowPopover";
 import { cn } from "@/lib/utils";
 import {
   MANDATORY_COLUMN_IDS,
+  OVERFLOW_ENABLED_COLUMN_IDS,
   FILTER_CATEGORIES,
   STORAGE_KEY_VISIBILITY,
   STORAGE_KEY_ORDER,
@@ -86,6 +93,9 @@ interface DataTableProps<TData, TValue> {
   highlightedRowId?: string | null;
   onEdit?: (row: TData) => void;
   onDelete?: (row: TData) => void;
+  onTrashClick?: () => void;
+  onExportExcel?: () => void;
+  onExportPdf?: () => void;
 }
 
 interface VirtualTableRowProps<TData> {
@@ -95,6 +105,7 @@ interface VirtualTableRowProps<TData> {
   lastPinnedId: string | undefined;
   isScrolledX: boolean;
   columnsSignature: string;
+  onCellDoubleClick?: (e: React.MouseEvent<HTMLTableCellElement>, columnId: string, value: any) => void;
 }
 
 const VirtualTableRow = React.memo(
@@ -104,6 +115,7 @@ const VirtualTableRow = React.memo(
     isRowHighlighted,
     lastPinnedId,
     isScrolledX,
+    onCellDoubleClick,
   }: VirtualTableRowProps<TData>) {
     return (
       <TableRow
@@ -118,12 +130,21 @@ const VirtualTableRow = React.memo(
         {row.getVisibleCells().map((cell) => {
           const isPinned = LOCKED_COLUMNS.includes(cell.column.id);
           const isLastPinned = cell.column.id === lastPinnedId;
+          const isOverflowEligible = (OVERFLOW_ENABLED_COLUMN_IDS as readonly string[]).includes(cell.column.id);
 
           return (
             <TableCell
               key={cell.id}
+              data-testid={`table-cell-${cell.column.id}`}
+              onDoubleClick={(e) => {
+                if (isOverflowEligible && onCellDoubleClick) {
+                  onCellDoubleClick(e, cell.column.id, cell.getValue());
+                }
+              }}
               className={cn(
-                "py-1.5 px-3 overflow-hidden text-ellipsis whitespace-nowrap border-b border-slate-100",
+                "py-1.5 px-3 text-ellipsis whitespace-nowrap border-b border-slate-100",
+                isLastPinned ? "overflow-visible" : "overflow-hidden",
+                isOverflowEligible && "cursor-default",
                 isRowHighlighted
                   ? isPinned
                     ? "sticky z-10 bg-sky-50 text-sky-950 font-semibold transition-colors duration-700"
@@ -131,7 +152,9 @@ const VirtualTableRow = React.memo(
                   : isPinned
                   ? "sticky z-10 bg-white text-slate-700 group-hover:bg-slate-50"
                   : "bg-white text-slate-700 group-hover:bg-slate-50",
-                isScrolledX && isLastPinned && "shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]"
+                isLastPinned &&
+                  "after:content-[''] after:absolute after:top-0 after:bottom-0 after:right-0 after:w-2.5 after:translate-x-full after:pointer-events-none after:transition-opacity after:duration-150 after:bg-gradient-to-r after:from-slate-900/[0.07] after:to-transparent",
+                isLastPinned && (isScrolledX ? "after:opacity-100" : "after:opacity-0")
               )}
               style={{
                 width: cell.column.getSize(),
@@ -156,7 +179,8 @@ const VirtualTableRow = React.memo(
       prev.isRowHighlighted === next.isRowHighlighted &&
       prev.lastPinnedId === next.lastPinnedId &&
       prev.isScrolledX === next.isScrolledX &&
-      prev.columnsSignature === next.columnsSignature
+      prev.columnsSignature === next.columnsSignature &&
+      prev.onCellDoubleClick === next.onCellDoubleClick
     );
   }
 ) as <TData>(props: VirtualTableRowProps<TData>) => React.ReactElement;
@@ -172,6 +196,9 @@ export function DataTable<TData, TValue>({
   highlightedRowId = null,
   onEdit,
   onDelete,
+  onTrashClick,
+  onExportExcel,
+  onExportPdf,
 }: DataTableProps<TData, TValue>) {
   const isFormActive = isFormMode ?? isCreateMode;
   const [sorting, setSorting] = React.useState<SortingState>(() => {
@@ -362,6 +389,39 @@ export function DataTable<TData, TValue>({
   const { rows } = table.getRowModel();
   const parentRef = React.useRef<HTMLDivElement>(null);
   const [isScrolledX, setIsScrolledX] = React.useState(false);
+  const [activeOverflow, setActiveOverflow] = React.useState<CellOverflowData | null>(null);
+
+  const prevScrollTopRef = React.useRef(0);
+
+  const handleCellDoubleClick = React.useCallback(
+    (e: React.MouseEvent<HTMLTableCellElement>, columnId: string, value: any) => {
+      if (!(OVERFLOW_ENABLED_COLUMN_IDS as readonly string[]).includes(columnId)) return;
+      const textVal = value != null ? String(value).trim() : "";
+      if (!textVal || textVal === "-") return;
+
+      // Clear any accidental word-selection created by browser native double-click
+      e.preventDefault();
+      if (typeof window !== "undefined") {
+        window.getSelection()?.removeAllRanges();
+        setTimeout(() => {
+          window.getSelection()?.removeAllRanges();
+        }, 20);
+      }
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      prevScrollTopRef.current = parentRef.current ? parentRef.current.scrollTop : 0;
+
+      setActiveOverflow({
+        text: textVal,
+        anchorRect: rect,
+      });
+    },
+    []
+  );
+
+  const handleCloseOverflow = React.useCallback(() => {
+    setActiveOverflow(null);
+  }, []);
 
   React.useEffect(() => {
     const el = parentRef.current;
@@ -369,14 +429,28 @@ export function DataTable<TData, TValue>({
 
     let rAFId: number | null = null;
     const handleScroll = () => {
+      const currentScrollTop = el.scrollTop;
+
+      // Vertical scroll strictly dismisses the overflow popover
+      if (Math.abs(currentScrollTop - prevScrollTopRef.current) > 1) {
+        setActiveOverflow(null);
+      }
+      // Horizontal scroll: popover stays open in its fixed place without closing
+
+      prevScrollTopRef.current = currentScrollTop;
+
       if (rAFId === null) {
         rAFId = window.requestAnimationFrame(() => {
-          const scrolled = el.scrollLeft > 2;
+          const scrolled = el.scrollLeft > 0;
           setIsScrolledX((prev) => (prev !== scrolled ? scrolled : prev));
           rAFId = null;
         });
       }
     };
+
+    // Run immediate check when container mounts or attaches
+    const initialScrolled = el.scrollLeft > 0;
+    setIsScrolledX(initialScrolled);
 
     el.addEventListener("scroll", handleScroll, { passive: true });
     return () => {
@@ -385,7 +459,7 @@ export function DataTable<TData, TValue>({
         window.cancelAnimationFrame(rAFId);
       }
     };
-  }, []);
+  }, [isFormActive]);
 
   const lastPinnedId = React.useMemo(() => {
     const visiblePinned = table
@@ -443,25 +517,114 @@ export function DataTable<TData, TValue>({
     <div className="space-y-4 flex flex-col flex-1 min-h-0">
       {/* Responsive Table Toolbar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 md:gap-4 w-full">
-        {/* Row 1 on Mobile: 3 equal-width buttons (Add Project, Filter, Columns) / Left Item on Desktop */}
-        <div className="grid grid-cols-3 gap-2 w-full md:flex md:w-auto md:items-center md:gap-3">
+        {/* Mobile Row 1: Action Slot (Add Project / Back) / Left Item on Desktop */}
+        <div className="w-full md:w-auto md:flex md:items-center md:gap-3">
           <div className="w-full md:w-auto [&>button]:w-full md:[&>button]:w-auto [&>button]:justify-center">
             {actionSlot}
           </div>
-          <div className="w-full md:hidden">
-            <DataTableFilter table={table} className="w-full" disabled={isFormActive} />
+        </div>
+
+        {/* Mobile Row 2: 4 Utility Buttons (Filter, Columns, Export, Trash) */}
+        <div className="grid grid-cols-4 gap-1.5 w-full md:hidden">
+          <div className="w-full">
+            <DataTableFilter table={table} className="w-full px-1 sm:px-2" disabled={isFormActive} />
           </div>
-          <div className="w-full md:hidden">
-            <DataTableViewOptions table={table} className="w-full" disabled={isFormActive} />
+          <div className="w-full">
+            <DataTableViewOptions table={table} className="w-full px-1 sm:px-2" disabled={isFormActive} />
+          </div>
+          <div className="w-full">
+            <DataTableExport
+              className="w-full px-1 sm:px-2"
+              disabled={isFormActive}
+              onExportExcel={onExportExcel}
+              onExportPdf={onExportPdf}
+            />
+          </div>
+          <div className="w-full">
+            <Button
+              data-testid="trash-button-mobile"
+              variant="outline"
+              size="lg"
+              disabled={isFormActive}
+              onClick={onTrashClick}
+              className={cn(
+                "group/trash h-10 w-full rounded-md flex items-center justify-center cursor-pointer px-1 sm:px-2 gap-1 shadow-sm transition-all text-xs border border-transparent bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
+                isFormActive &&
+                  "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 !text-slate-700 shadow-2xs"
+              )}
+            >
+              <span
+                className={cn(
+                  "material-symbols-outlined text-[18px] transition-colors leading-none select-none",
+                  isFormActive
+                    ? "!text-slate-500"
+                    : "text-slate-500 group-hover/trash:text-telkom-navy"
+                )}
+              >
+                restore_from_trash
+              </span>
+              <span
+                className={cn(
+                  "font-medium truncate transition-colors",
+                  isFormActive
+                    ? "!text-slate-700"
+                    : "text-slate-600 group-hover/trash:text-telkom-navy"
+                )}
+              >
+                Trash
+              </span>
+            </Button>
           </div>
         </div>
 
-        {/* Search Bar (Full-width on mobile row 2) & Desktop Controls (Search + Filter + Columns) */}
+        {/* Search Bar (Mobile Row 3 / Desktop Right Item) & Desktop Controls */}
         <div className="flex flex-col md:flex-row items-center gap-2.5 md:gap-3 w-full md:w-auto">
-          <DataTableSearchInput table={table} className="w-full md:w-[420px]" disabled={isFormActive} />
-          <div className="hidden md:flex items-center gap-3">
+          <DataTableSearchInput
+            table={table}
+            className="w-full md:w-[280px] lg:w-[340px] xl:w-[400px]"
+            disabled={isFormActive}
+          />
+          <div className="hidden md:flex items-center gap-2 lg:gap-2.5">
             <DataTableFilter table={table} disabled={isFormActive} />
             <DataTableViewOptions table={table} disabled={isFormActive} />
+            <DataTableExport
+              disabled={isFormActive}
+              onExportExcel={onExportExcel}
+              onExportPdf={onExportPdf}
+            />
+            <Button
+              data-testid="trash-button"
+              variant="outline"
+              size="lg"
+              disabled={isFormActive}
+              onClick={onTrashClick}
+              className={cn(
+                "group/trash h-10 rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-4 gap-1.5 sm:gap-2 shadow-sm transition-all text-xs sm:text-sm border border-transparent bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
+                isFormActive &&
+                  "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 !text-slate-700 shadow-2xs"
+              )}
+            >
+              <span
+                className={cn(
+                  "material-symbols-outlined text-[18px] sm:text-[20px] transition-colors leading-none select-none",
+                  isFormActive
+                    ? "!text-slate-500"
+                    : "text-slate-500 group-hover/trash:text-telkom-navy"
+                )}
+              >
+                restore_from_trash
+              </span>
+              <span
+                className={cn(
+                  "font-medium truncate transition-colors",
+                  isFormActive
+                    ? "!text-slate-700"
+                    : "text-slate-600 group-hover/trash:text-telkom-navy"
+                )}
+              >
+                Trash
+              </span>
+            </Button>
           </div>
         </div>
       </div>
@@ -484,7 +647,7 @@ export function DataTable<TData, TValue>({
               return values.map((val) => (
                 <span
                   key={`${filter.id}-${val}`}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200 shadow-2xs group hover:border-slate-300 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 shadow-2xs transition-colors"
                 >
                   <span className="text-slate-400 font-normal">{label}:</span>
                   <span className="text-telkom-navy font-semibold">{val}</span>
@@ -525,7 +688,7 @@ export function DataTable<TData, TValue>({
 
       {/* Main Table or Form Content Frame */}
       <div 
-        className="rounded-lg border border-slate-200 bg-white shadow-sm flex-1 min-h-0 w-full relative overflow-hidden flex flex-col isolate"
+        className="rounded-lg bg-white shadow-sm flex-1 min-h-0 w-full relative overflow-hidden flex flex-col isolate"
       >
         {isFormActive && createFormSlot ? (
           createFormSlot
@@ -537,7 +700,7 @@ export function DataTable<TData, TValue>({
             style={{ willChange: "scroll-position" }}
           >
             <table className="w-full caption-bottom text-sm border-separate border-spacing-0" style={{ width: table.getTotalSize(), tableLayout: 'fixed' }}>
-          <TableHeader className="bg-slate-100 sticky top-0 z-20 shadow-[0_1px_2px_rgba(0,0,0,0.1)]">
+          <TableHeader className="bg-slate-100 sticky top-0 z-30">
             {table.getHeaderGroups().map((headerGroup) => {
               const visiblePinnedIds = headerGroup.headers
                 .map((h) => h.column.id)
@@ -554,9 +717,12 @@ export function DataTable<TData, TValue>({
                       <TableHead 
                         key={header.id} 
                         className={cn(
-                          "text-telkom-navy font-semibold h-11 relative group/resizer overflow-hidden text-ellipsis bg-slate-100 border-b border-slate-200",
-                          isPinned ? "sticky z-30" : "sticky top-0 z-20",
-                          isScrolledX && isLastPinned && "shadow-[4px_0_8px_-2px_rgba(0,0,0,0.08)]"
+                          "text-telkom-navy font-semibold h-11 group/resizer text-ellipsis bg-slate-100 border-b border-slate-200",
+                          isLastPinned ? "overflow-visible" : "overflow-hidden",
+                          isPinned ? "sticky z-50" : "sticky top-0 z-30",
+                          isLastPinned &&
+                            "after:content-[''] after:absolute after:top-0 after:bottom-0 after:right-0 after:w-2 after:translate-x-full after:pointer-events-none after:transition-opacity after:duration-150 after:bg-gradient-to-r after:from-slate-900/[0.04] after:to-transparent",
+                          isLastPinned && (isScrolledX ? "after:opacity-100" : "after:opacity-0")
                         )}
                         style={{ 
                           width: header.getSize(),
@@ -608,8 +774,11 @@ export function DataTable<TData, TValue>({
                           key={`skeleton-cell-${header.id}-${rowIndex}`}
                           className={cn(
                             "py-2.5 border-b border-slate-100",
+                            isLastPinned ? "overflow-visible" : "overflow-hidden",
                             isPinned ? "sticky z-10 bg-white" : "bg-white",
-                            isScrolledX && isLastPinned && "shadow-[4px_0_8px_-2px_rgba(0,0,0,0.06)]"
+                            isLastPinned &&
+                              "after:content-[''] after:absolute after:top-0 after:bottom-0 after:right-0 after:w-2 after:translate-x-full after:pointer-events-none after:transition-opacity after:duration-150 after:bg-gradient-to-r after:from-slate-900/[0.04] after:to-transparent",
+                            isLastPinned && (isScrolledX ? "after:opacity-100" : "after:opacity-0")
                           )}
                           style={{
                             width: header.getSize(),
@@ -635,7 +804,7 @@ export function DataTable<TData, TValue>({
             ) : rows.length ? (
               <>
                 {paddingTop > 0 && (
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow className="hover:bg-transparent border-0">
                     <TableCell colSpan={table.getVisibleLeafColumns().length} style={{ height: `${paddingTop}px`, padding: 0, border: 0 }} />
                   </TableRow>
                 )}
@@ -655,11 +824,12 @@ export function DataTable<TData, TValue>({
                       lastPinnedId={lastPinnedId}
                       isScrolledX={isScrolledX}
                       columnsSignature={columnsSignature}
+                      onCellDoubleClick={handleCellDoubleClick}
                     />
                   );
                 })}
                 {paddingBottom > 0 && (
-                  <TableRow className="hover:bg-transparent">
+                  <TableRow className="hover:bg-transparent border-0">
                     <TableCell colSpan={table.getVisibleLeafColumns().length} style={{ height: `${paddingBottom}px`, padding: 0, border: 0 }} />
                   </TableRow>
                 )}
@@ -680,6 +850,7 @@ export function DataTable<TData, TValue>({
       </div>
         )}
       </div>
+      <CellOverflowPopover data={activeOverflow} onClose={handleCloseOverflow} />
     </div>
   );
 }

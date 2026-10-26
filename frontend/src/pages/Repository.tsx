@@ -279,7 +279,7 @@ export default function Repository() {
                 size="lg"
                 variant="outline"
                 onClick={handleBackClick}
-                className="w-full md:w-auto bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 rounded-lg shadow-sm hover:shadow transition-all h-10 px-2 sm:px-4 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
+                className="w-full md:w-auto bg-white border border-transparent text-slate-700 hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100 rounded-md shadow-sm hover:shadow transition-all h-10 px-2 sm:px-4 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
               >
                 <span className="material-symbols-outlined text-[18px] sm:text-[20px] select-none leading-none">
                   arrow_back
@@ -291,7 +291,7 @@ export default function Repository() {
                 data-testid="btn-add-project"
                 size="lg"
                 onClick={handleAddClick}
-                className="w-full md:w-auto bg-telkom-navy text-white hover:bg-[#003d82] active:bg-[#002047] rounded-lg shadow-sm hover:shadow-md transition-all h-10 px-2 sm:px-4 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
+                className="w-full md:w-auto bg-telkom-navy text-white hover:bg-[#003d82] active:bg-[#002047] rounded-md shadow-sm hover:shadow-md transition-all h-10 px-2 sm:px-4 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
               >
                 <span className="material-symbols-outlined text-[18px] sm:text-[20px] select-none leading-none">
                   add

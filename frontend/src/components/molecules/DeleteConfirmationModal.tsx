@@ -47,10 +47,10 @@ export function DeleteConfirmationModal({
     >
       <div
         data-testid="delete-confirmation-modal"
-        className="relative rounded-2xl border border-slate-200/90 bg-white p-6 shadow-2xl max-w-md w-full space-y-5 animate-in zoom-in-95 duration-200 select-none"
+        className="relative rounded-2xl border-none bg-white p-6 shadow-2xl max-w-md w-full space-y-5 animate-in zoom-in-95 duration-200 select-none"
       >
         {/* Warning Icon Badge */}
-        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 border border-rose-100 text-rose-600 shadow-2xs">
+        <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600 shadow-2xs">
           <Trash2 className="h-6 w-6 stroke-[2]" />
         </div>
 
@@ -72,7 +72,7 @@ export function DeleteConfirmationModal({
         </div>
 
         {/* Project Name Framed Container */}
-        <div className="rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 text-center shadow-2xs">
+        <div className="rounded-xl bg-slate-50/80 p-3.5 text-center shadow-2xs">
           <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 select-none">
             Nama Proyek
           </span>
@@ -89,7 +89,7 @@ export function DeleteConfirmationModal({
             variant="outline"
             onClick={onCancel}
             disabled={isDeleting}
-            className="w-full h-10 rounded-lg text-sm font-medium border-slate-200 hover:bg-slate-100 text-slate-700 cursor-pointer"
+            className="w-full h-10 rounded-lg text-sm font-medium border border-transparent hover:border-telkom-navy hover:bg-slate-100 text-slate-700 cursor-pointer"
           >
             Cancel
           </Button>

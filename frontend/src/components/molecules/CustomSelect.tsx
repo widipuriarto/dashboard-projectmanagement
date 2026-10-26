@@ -14,13 +14,14 @@ export interface SelectOption {
 
 export interface CustomSelectProps {
   id?: string;
-  value?: string;
+  value?: string | null;
   onChange?: (value: string) => void;
   options: (string | SelectOption)[];
   placeholder?: string;
   disabled?: boolean;
   error?: string;
   className?: string;
+  allowClear?: boolean;
   "data-testid"?: string;
 }
 
@@ -32,6 +33,7 @@ export function CustomSelect({
   disabled = false,
   error,
   className,
+  allowClear = true,
   "data-testid": testId,
 }: CustomSelectProps) {
   const [isOpen, setIsOpen] = React.useState(false);
@@ -41,15 +43,22 @@ export function CustomSelect({
   const [menuWidth, setMenuWidth] = React.useState<number | undefined>();
 
   const normalizedOptions = React.useMemo<SelectOption[]>(() => {
-    return options.map((opt) => {
+    const mapped = options.map((opt) => {
       if (typeof opt === "string") {
         return { value: opt, label: opt };
       }
       return opt;
     });
-  }, [options]);
+
+    if (allowClear && !mapped.some((o) => o.value === "")) {
+      return [{ value: "", label: placeholder }, ...mapped];
+    }
+
+    return mapped;
+  }, [options, allowClear, placeholder]);
 
   const selectedOption = React.useMemo(() => {
+    if (!value) return null;
     return normalizedOptions.find((opt) => opt.value === value);
   }, [normalizedOptions, value]);
 
@@ -63,7 +72,7 @@ export function CustomSelect({
   // Sync highlighted option index when opening dropdown
   React.useEffect(() => {
     if (isOpen) {
-      const idx = normalizedOptions.findIndex((opt) => opt.value === value);
+      const idx = normalizedOptions.findIndex((opt) => opt.value === (value || ""));
       setHighlightedIndex(idx >= 0 ? idx : 0);
     } else {
       setHighlightedIndex(-1);
@@ -155,12 +164,12 @@ export function CustomSelect({
         type="button"
         onKeyDown={handleKeyDown}
         className={cn(
-          "w-full h-10 px-3 rounded-lg border bg-white text-sm shadow-2xs transition-all flex items-center justify-between text-left outline-none select-none cursor-pointer",
+          "w-full h-10 px-3 rounded-lg border bg-white text-sm transition-all flex items-center justify-between text-left outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0 select-none cursor-pointer",
           error
-            ? "border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-500/15"
+            ? "border-red-400 focus:border-red-500"
             : isOpen
-            ? "border-telkom-navy ring-2 ring-telkom-navy/15"
-            : "border-slate-200 hover:border-slate-300 focus:border-telkom-navy focus:ring-2 focus:ring-telkom-navy/15",
+            ? "border-telkom-navy ring-0 outline-none"
+            : "border-slate-400 hover:border-slate-500 focus:border-telkom-navy",
           disabled && "bg-slate-50 opacity-60 cursor-not-allowed pointer-events-none",
           className
         )}
@@ -187,15 +196,17 @@ export function CustomSelect({
         sideOffset={4}
         onKeyDown={handleKeyDown}
         style={{ width: menuWidth ? `${menuWidth}px` : "auto", minWidth: menuWidth ? `${menuWidth}px` : "180px" }}
-        className="p-1.5 rounded-xl border border-slate-200/90 bg-white shadow-xl max-h-64 overflow-y-auto space-y-0.5 z-50 duration-150 [scrollbar-width:thin]"
+        className="p-1.5 rounded-xl border-none bg-white shadow-xl max-h-64 overflow-y-auto space-y-0.5 z-50 duration-150 [scrollbar-width:thin]"
       >
         {normalizedOptions.map((opt, idx) => {
-          const isSelected = opt.value === value;
+          const isSelected = opt.value === (value || "");
           const isHighlighted = idx === highlightedIndex;
+          const isClearOpt = opt.value === "";
+
           return (
             <button
-              key={opt.value}
-              data-testid={`select-option-${opt.value}`}
+              key={opt.value || `clear-option-${idx}`}
+              data-testid={opt.value ? `select-option-${opt.value}` : "select-option-clear"}
               ref={(el) => {
                 optionsRef.current[idx] = el;
               }}
@@ -208,10 +219,14 @@ export function CustomSelect({
                   ? "bg-telkom-navy/10 text-telkom-navy font-semibold"
                   : isHighlighted
                   ? "bg-slate-100 text-slate-900 font-medium"
+                  : isClearOpt
+                  ? "text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-normal"
                   : "text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium"
               )}
             >
-              <span className="truncate mr-2">{opt.label}</span>
+              <span className={cn("truncate mr-2", isClearOpt && "text-slate-400 font-normal")}>
+                {opt.label}
+              </span>
               {isSelected && <Check className="h-4 w-4 text-telkom-navy shrink-0" />}
             </button>
           );

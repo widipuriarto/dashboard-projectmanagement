@@ -36,7 +36,7 @@ export const ProjectFormBasicInfo = React.memo(function ProjectFormBasicInfo({
           readOnly
           data-testid="input-project-id-pm"
           value={generatedProjectId}
-          className="bg-slate-50 text-slate-700 font-mono font-medium cursor-not-allowed border-slate-200 select-all"
+          className="bg-slate-50 text-slate-700 font-mono font-medium cursor-not-allowed border-slate-400 select-all"
         />
       </FormField>
 
@@ -52,7 +52,6 @@ export const ProjectFormBasicInfo = React.memo(function ProjectFormBasicInfo({
               e.target.value ? parseInt(e.target.value, 10) : null
             )
           }
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -87,7 +86,6 @@ export const ProjectFormBasicInfo = React.memo(function ProjectFormBasicInfo({
           placeholder="Masukkan nama project lengkap..."
           value={formData.nama_proyek}
           onChange={(e) => updateField("nama_proyek", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -99,7 +97,6 @@ export const ProjectFormBasicInfo = React.memo(function ProjectFormBasicInfo({
           placeholder="Masukkan nama pelanggan..."
           value={formData.nama_pelanggan}
           onChange={(e) => updateField("nama_pelanggan", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -110,7 +107,6 @@ export const ProjectFormBasicInfo = React.memo(function ProjectFormBasicInfo({
           placeholder="Masukkan nama mitra..."
           value={formData.nama_mitra}
           onChange={(e) => updateField("nama_mitra", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -132,7 +128,6 @@ export const ProjectFormBasicInfo = React.memo(function ProjectFormBasicInfo({
           placeholder="Contoh: LOP-401428-1694593421915"
           value={formData.idlop}
           onChange={(e) => updateField("idlop", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
     </FormSection>

@@ -63,7 +63,7 @@ export default function Breadcrumbs() {
         onClick={toggleSidebar}
         className={cn(
           "inline-flex items-center justify-center h-9 w-9 rounded-md text-slate-600 border border-transparent transition-all select-none cursor-pointer shrink-0",
-          "hover:text-slate-900 hover:bg-slate-50 hover:border-slate-200/80 hover:shadow-[0_1px_2px_rgba(0,0,0,0.03)]",
+          "hover:text-slate-900 hover:bg-slate-50 hover:border-slate-200/80",
           "active:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy"
         )}
         aria-label={isCollapsed ? "Expand sidebar (Ctrl+B)" : "Collapse sidebar (Ctrl+B)"}
@@ -95,7 +95,7 @@ export default function Breadcrumbs() {
                   <span
                     className={cn(
                       pillBaseClasses,
-                      "text-slate-900 bg-slate-50 border border-slate-200/80 shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+                      "text-slate-900 bg-slate-50 border border-slate-200/80"
                     )}
                     aria-current="page"
                   >
@@ -112,7 +112,7 @@ export default function Breadcrumbs() {
                     className={cn(
                       pillBaseClasses,
                       "text-slate-600 border border-transparent",
-                      "hover:text-slate-900 hover:bg-slate-50 hover:border-slate-200/80 hover:shadow-[0_1px_2px_rgba(0,0,0,0.03)]"
+                      "hover:text-slate-900 hover:bg-slate-50 hover:border-slate-200/80"
                     )}
                   >
                     {item.label}

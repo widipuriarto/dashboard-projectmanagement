@@ -83,5 +83,20 @@ describe("Skenario 1: Master Repository Table & Virtual Scrolling", () => {
       .invoke("attr", "data-index")
       .should("eq", "0");
   });
-});
 
+  it("Test 1.4: harus menampilkan cell overflow popover saat sel teks panjang di-double-click dan menutup saat Escape", () => {
+    // 1. Double click pada sel nama proyek di baris pertama
+    cy.get('[data-testid="table-cell-nama_proyek"]').first().dblclick();
+
+    // 2. Popover overflow sel harus muncul di layar
+    cy.get('[data-testid="cell-overflow-popover"]')
+      .should("be.visible")
+      .and("not.be.empty");
+
+    // 3. Tekan Escape untuk menutup popover
+    cy.get("body").type("{esc}");
+
+    // 4. Popover overflow sel harus tertutup
+    cy.get('[data-testid="cell-overflow-popover"]').should("not.exist");
+  });
+});

@@ -88,10 +88,21 @@ export function DataTableSearchInput<TData>({
     }
   }, [query, targetColumn, table]);
 
+  // Handle column selection and smoothly transfer focus to search input
+  const handleSelectColumn = React.useCallback((colId: string) => {
+    setTargetColumn(colId);
+    setIsDropdownOpen(false);
+    setColumnSearchQuery("");
+    inputRef.current?.focus();
+    setTimeout(() => {
+      inputRef.current?.focus();
+    }, 50);
+  }, []);
+
   return (
     <div
       className={cn(
-        "relative flex items-center h-10 w-full md:w-[420px] bg-white border border-slate-200 rounded-lg shadow-sm transition-all",
+        "relative flex items-center h-10 w-full md:w-[420px] bg-white border border-transparent rounded-md shadow-sm transition-all",
         disabled
           ? "opacity-80 pointer-events-none cursor-not-allowed bg-slate-100/70 border-slate-300 shadow-2xs"
           : "hover:border-telkom-navy focus-within:border-telkom-navy focus-within:ring-1 focus-within:ring-telkom-navy",
@@ -106,23 +117,23 @@ export function DataTableSearchInput<TData>({
         <PopoverTrigger
           data-testid="search-column-dropdown"
           className={cn(
-            "inline-flex items-center gap-1.5 h-7 px-2.5 mx-1 rounded-md text-xs font-semibold cursor-pointer select-none transition-all shrink-0 outline-none",
+            "inline-flex items-center gap-1.5 h-7 px-2.5 mx-1 rounded-md text-xs font-semibold cursor-pointer select-none transition-all shrink-0 outline-none bg-transparent hover:bg-slate-100",
             disabled
               ? "text-slate-700"
               : targetColumn !== "all"
-              ? "bg-telkom-navy/10 text-telkom-navy hover:bg-telkom-navy/15"
-              : "text-slate-600 hover:text-telkom-navy hover:bg-slate-100"
+              ? "text-telkom-navy"
+              : "text-slate-600 hover:text-telkom-navy"
           )}
           title="Select target column to search"
         >
           <span className="max-w-[125px] truncate">{activeColumnLabel}</span>
-          <ChevronDown className={cn("h-3 w-3 shrink-0", disabled ? "text-slate-500" : "text-slate-400")} />
+          <ChevronDown className={cn("h-3 w-3 shrink-0", disabled ? "text-slate-500" : targetColumn !== "all" ? "text-telkom-navy" : "text-slate-400")} />
         </PopoverTrigger>
 
         <PopoverContent
           align="start"
           sideOffset={8}
-          className="w-64 p-2 rounded-2xl shadow-xl border border-slate-200 bg-white"
+          className="w-64 p-2 rounded-2xl shadow-xl border-none bg-white"
         >
           {/* Quick Filter Input inside Dropdown */}
           <div className="relative mb-1.5">
@@ -151,11 +162,7 @@ export function DataTableSearchInput<TData>({
             <button
               type="button"
               data-testid="search-column-all"
-              onClick={() => {
-                setTargetColumn("all");
-                setIsDropdownOpen(false);
-                setColumnSearchQuery("");
-              }}
+              onClick={() => handleSelectColumn("all")}
               className={cn(
                 "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer",
                 targetColumn === "all"
@@ -179,11 +186,7 @@ export function DataTableSearchInput<TData>({
                   key={col.id}
                   data-testid={`search-column-${col.id}`}
                   type="button"
-                  onClick={() => {
-                    setTargetColumn(col.id);
-                    setIsDropdownOpen(false);
-                    setColumnSearchQuery("");
-                  }}
+                  onClick={() => handleSelectColumn(col.id)}
                   className={cn(
                     "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer",
                     isSelected

@@ -39,7 +39,6 @@ export const ProjectFormStatus = React.memo(function ProjectFormStatus({
           placeholder="Status Goods Receipt..."
           value={formData.status_gr}
           onChange={(e) => updateField("status_gr", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -64,7 +63,7 @@ export const ProjectFormStatus = React.memo(function ProjectFormStatus({
           placeholder="Catatan update progres terbaru dari proyek ini..."
           value={formData.ket_update}
           onChange={(e) => updateField("ket_update", e.target.value)}
-          className="w-full p-3 rounded-lg border border-slate-200 bg-white text-sm text-slate-800 placeholder:text-slate-400 shadow-2xs transition-all outline-none focus:border-telkom-navy focus:ring-2 focus:ring-telkom-navy/15 resize-y"
+          className="w-full p-3 rounded-lg border border-slate-400 hover:border-slate-500 bg-white text-sm text-slate-800 placeholder:text-slate-400 transition-all outline-none focus:border-telkom-navy focus:ring-0 resize-y"
         />
       </FormField>
 
@@ -74,7 +73,7 @@ export const ProjectFormStatus = React.memo(function ProjectFormStatus({
           placeholder="https://telkomind.sharepoint.com/:f:/r/..."
           value={formData.file_bast}
           onChange={(e) => updateField("file_bast", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy font-mono text-xs"
+          className="font-mono text-xs"
         />
       </FormField>
 
@@ -84,7 +83,7 @@ export const ProjectFormStatus = React.memo(function ProjectFormStatus({
           placeholder="https://telkomind.sharepoint.com/:f:/r/..."
           value={formData.file_bapl}
           onChange={(e) => updateField("file_bapl", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy font-mono text-xs"
+          className="font-mono text-xs"
         />
       </FormField>
     </FormSection>

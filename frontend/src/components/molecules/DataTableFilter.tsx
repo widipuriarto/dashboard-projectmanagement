@@ -212,12 +212,12 @@ export function DataTableFilter<TData>({
         disabled={disabled}
         className={cn(
           buttonVariants({ variant: "outline", size: "lg" }),
-          "group/filter h-10 rounded-lg flex items-center justify-center cursor-pointer px-2 sm:px-4 gap-1.5 sm:gap-2 shadow-sm transition-all text-xs sm:text-sm",
+          "group/filter h-10 rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-4 gap-1.5 sm:gap-2 shadow-sm transition-all text-xs sm:text-sm",
           disabled
             ? "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 !text-slate-700 shadow-2xs"
             : isOpen || activeCategoriesCount > 0
             ? "border-telkom-navy bg-slate-50 text-telkom-navy shadow-inner"
-            : "border-slate-200 bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
+            : "border-transparent bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
           className
         )}
       >
@@ -255,7 +255,7 @@ export function DataTableFilter<TData>({
 
       <PopoverContent
         align="end"
-        className="w-[calc(100vw-32px)] sm:w-[460px] max-w-[460px] p-0 shadow-xl border-slate-200 rounded-2xl overflow-hidden"
+        className="w-[calc(100vw-32px)] sm:w-[460px] max-w-[460px] p-0 shadow-xl border-none rounded-2xl overflow-hidden"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-white">

@@ -470,13 +470,13 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
       />
 
       {/* Sticky Header with Breadcrumbs mirroring Navbar style */}
-      <div className="flex items-center justify-between h-14 px-6 border-b border-slate-200 bg-slate-100 sticky top-0 z-20 select-none rounded-t-lg shadow-[0_1px_2px_rgba(0,0,0,0.03)]">
+      <div className="flex items-center justify-between h-14 px-6 border-b border-slate-200 bg-slate-100 sticky top-0 z-20 select-none rounded-t-lg">
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             data-testid="btn-header-back"
             onClick={handleAttemptCancel}
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-slate-600 border border-transparent transition-all select-none cursor-pointer shrink-0 hover:text-slate-900 hover:bg-white hover:border-slate-200/80 hover:shadow-2xs active:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-slate-600 border border-transparent transition-all select-none cursor-pointer shrink-0 hover:text-slate-900 hover:bg-white hover:border-slate-200/80 active:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy"
             title="Master Repository"
             aria-label="Back to Master Repository"
           >
@@ -485,7 +485,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
           <span className="material-symbols-outlined text-[9.5px] text-slate-400 select-none leading-none">
             arrow_forward_ios
           </span>
-          <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-white border border-slate-200/80 text-xs sm:text-sm font-semibold text-telkom-navy shadow-2xs">
+          <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-white border border-slate-200/80 text-xs sm:text-sm font-semibold text-telkom-navy">
             {isEditMode ? (
               <>
                 <span className="material-symbols-outlined text-[16px] text-telkom-navy leading-none select-none">

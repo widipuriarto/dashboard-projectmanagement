@@ -21,7 +21,7 @@ export function UnsavedChangesModal({
     >
       <div
         data-testid="unsaved-changes-modal"
-        className="rounded-xl border border-slate-200 bg-white p-6 shadow-2xl max-w-sm w-full text-center space-y-5 animate-in zoom-in-95 duration-200 select-none"
+        className="rounded-xl border-none bg-white p-6 shadow-2xl max-w-sm w-full text-center space-y-5 animate-in zoom-in-95 duration-200 select-none"
       >
         <p className="text-base font-bold text-slate-800 tracking-tight">
           Discard Unsaved Changes?
@@ -33,7 +33,7 @@ export function UnsavedChangesModal({
             data-testid="unsaved-modal-cancel"
             variant="outline"
             onClick={onCancel}
-            className="w-full h-10 rounded-lg text-sm font-medium border-slate-200 hover:bg-slate-100 text-slate-700 cursor-pointer"
+            className="w-full h-10 rounded-lg text-sm font-medium border border-transparent hover:border-telkom-navy hover:bg-slate-100 text-slate-700 cursor-pointer"
           >
             Cancel
           </Button>

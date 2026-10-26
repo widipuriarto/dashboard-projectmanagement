@@ -30,7 +30,6 @@ export const ProjectFormDelivery = React.memo(function ProjectFormDelivery({
           placeholder="Contoh: 1-39653888125"
           value={formData.no_order}
           onChange={(e) => updateField("no_order", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -40,7 +39,6 @@ export const ProjectFormDelivery = React.memo(function ProjectFormDelivery({
           placeholder="Contoh: 1794503720"
           value={formData.sid}
           onChange={(e) => updateField("sid", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -50,7 +48,6 @@ export const ProjectFormDelivery = React.memo(function ProjectFormDelivery({
           placeholder="Jenis layanan..."
           value={formData.jenis_layanan}
           onChange={(e) => updateField("jenis_layanan", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
@@ -69,7 +66,6 @@ export const ProjectFormDelivery = React.memo(function ProjectFormDelivery({
           placeholder="Jenis dokumen delivery..."
           value={formData.jenis_dok_delivery}
           onChange={(e) => updateField("jenis_dok_delivery", e.target.value)}
-          className="border-slate-200 focus:border-telkom-navy"
         />
       </FormField>
 
