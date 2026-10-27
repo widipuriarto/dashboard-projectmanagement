@@ -355,8 +355,9 @@ export const columns: ColumnDef<ProjectPM>[] = [
     accessorKey: "witel",
     filterFn: multiSelectFilterFn,
     header: () => <div className="text-center">WITEL</div>,
-    cell: ({ row }) => <div className="text-center">{row.getValue("witel") || "-"}</div>,
-    size: 100,
+    cell: ({ row }) => <div className="text-left">{row.getValue("witel") || "-"}</div>,
+    size: 180,
+    minSize: 160,
   },
   {
     accessorKey: "nama_proyek",
@@ -465,8 +466,8 @@ export const columns: ColumnDef<ProjectPM>[] = [
     cell: ({ row }) => {
       const status = (row.getValue("status_dokumen_obl") as string) || "-";
       const lower = status.toLowerCase();
-      const variant = lower.includes("closed") || lower.includes("done") || lower.includes("complete") ? "success" 
-                    : lower.includes("pending") || lower.includes("progress") || lower.includes("on going") ? "warning" 
+      const variant = lower.includes("ok") ? "success"
+                    : lower.includes("process") ? "warning"
                     : "default";
       return (
         <div className="flex justify-center">
@@ -499,8 +500,9 @@ export const columns: ColumnDef<ProjectPM>[] = [
     cell: ({ row }) => {
       const status = (row.getValue("status_delivery_project") as string) || "-";
       const lower = status.toLowerCase();
-      const variant = lower.includes("closed") || lower.includes("done") || lower.includes("complete") ? "success" 
-                    : lower.includes("pending") || lower.includes("progress") || lower.includes("on going") ? "warning" 
+      const variant = lower.includes("delivered") || lower.includes("closed") || lower.includes("done") || lower.includes("complete") ? "success" 
+                    : lower.includes("in process") || lower.includes("pending") || lower.includes("progress") || lower.includes("on going") ? "warning" 
+                    : lower.includes("hold") ? "destructive"
                     : "default";
       return (
         <div className="flex justify-center">
@@ -637,8 +639,9 @@ export const columns: ColumnDef<ProjectPM>[] = [
     cell: ({ row }) => {
       const status = (row.getValue("status_order") as string) || "-";
       const lower = status.toLowerCase();
-      const variant = lower.includes("closing") || lower.includes("closed") || lower.includes("done") || lower.includes("complete") ? "success" 
-                    : lower.includes("pending") || lower.includes("progress") || lower.includes("bc") ? "warning" 
+      const variant = lower.includes("01 bc") || lower.includes("closing") || lower.includes("closed") || lower.includes("done") || lower.includes("complete") ? "success" 
+                    : lower.includes("pending") || lower.includes("progress") ? "warning" 
+                    : lower.includes("issue") ? "destructive"
                     : "default";
       return (
         <div className="flex justify-center">
@@ -700,8 +703,20 @@ export const columns: ColumnDef<ProjectPM>[] = [
   },
   {
     accessorKey: "status_gr",
+    filterFn: multiSelectFilterFn,
     header: () => <div className="text-center">Status GR</div>,
-    cell: ({ row }) => <div className="text-center">{row.getValue("status_gr") || "-"}</div>,
+    cell: ({ row }) => {
+      const val = (row.getValue("status_gr") as string) || "-";
+      const lower = val.toLowerCase();
+      const variant = lower.includes("done") ? "success"
+                    : lower.includes("inprocess") || lower.includes("process") ? "warning"
+                    : "default";
+      return (
+        <div className="flex justify-center">
+          {val !== "-" ? <StatusBadge variant={variant}>{val}</StatusBadge> : <span className="text-slate-400">-</span>}
+        </div>
+      );
+    },
     size: 150,
   },
   {
@@ -712,8 +727,8 @@ export const columns: ColumnDef<ProjectPM>[] = [
       const val = (row.getValue("hardfile_bast") as string) || "-";
       const lower = val.toLowerCase();
       const variant = lower.includes("tidak") || lower.includes("belum") ? "destructive" 
-                    : lower.includes("ada") ? "success" 
-                    : lower.includes("pending") || lower.includes("proses") ? "warning" 
+                    : lower.includes("ada") || lower.includes("done") ? "success" 
+                    : lower.includes("pending") || lower.includes("proses") || lower.includes("inprocess") ? "warning" 
                     : "default";
       return (
         <div className="flex justify-center">

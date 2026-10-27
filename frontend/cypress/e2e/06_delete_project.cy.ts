@@ -65,20 +65,21 @@ describe("Skenario 6: Hapus Proyek (CRUD: Delete)", () => {
     cy.get('[data-testid="input-tahun-kontrak"]').clear().type("2028");
 
     cy.get('[data-testid="select-witel"]').click();
-    cy.get('[data-testid="select-option-SJU"]').click();
+    cy.get('[data-testid="select-option-SMG JATENG UTARA"]').click();
 
     cy.get('[data-testid="select-segment"]').click();
-    cy.get('[data-testid="select-option-DES"]').click();
+    cy.get('[data-testid="select-option-DPS"]').click();
 
     cy.get('[data-testid="input-nama-proyek"]').type(testProjectName);
     cy.get('[data-testid="input-nama-pelanggan"]').type("PT Pelanggan Hapus Otomasi");
-    cy.get('[data-testid="input-nama-mitra"]').type("PT Mitra Hapus Otomasi");
+    cy.get('[data-testid="select-nama-mitra"]').click();
+    cy.get('[data-testid="select-option-TELKOMSEL"]').click();
 
     cy.get('[data-testid="select-status-email-handover"]').click();
     cy.get('[data-testid="select-option-OK"]').click();
 
     cy.get('[data-testid="select-status-dokumen-obl"]').click();
-    cy.contains("button", "NOPES/KL OK").click();
+    cy.contains("button", "KL/NOPES OK").click();
 
     // 3. Simpan proyek
     cy.get('[data-testid="btn-save-project"]').click();

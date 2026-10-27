@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, X } from "lucide-react";
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight, ChevronDown, X } from "lucide-react";
 import {
   Popover,
   PopoverContent,
@@ -47,6 +47,7 @@ export function DatePicker({
   const [viewMonth, setViewMonth] = React.useState<number>(() => {
     return parsedDate ? parsedDate.getMonth() : new Date().getMonth();
   });
+  const [isYearPickerOpen, setIsYearPickerOpen] = React.useState(false);
 
   // Keep view in sync when value changes externally
   React.useEffect(() => {
@@ -55,6 +56,13 @@ export function DatePicker({
       setViewMonth(parsedDate.getMonth());
     }
   }, [parsedDate]);
+
+  // Reset year picker view when calendar closes
+  React.useEffect(() => {
+    if (!isOpen) {
+      setIsYearPickerOpen(false);
+    }
+  }, [isOpen]);
 
   // Format display text for input trigger
   const displayLabel = React.useMemo(() => {
@@ -181,7 +189,7 @@ export function DatePicker({
         align="start"
         side="bottom"
         sideOffset={6}
-        className="w-[280px] sm:w-[300px] p-3 rounded-2xl border-none bg-white shadow-xl z-50 duration-150"
+        className="w-[300px] p-3 rounded-2xl border-none bg-white shadow-xl z-50 duration-75 hide-scrollbar"
       >
         {/* Calendar Header with Month/Year Navigation */}
         <div className="flex items-center justify-between mb-3 px-1">
@@ -198,17 +206,25 @@ export function DatePicker({
             <span className="font-semibold text-xs sm:text-sm text-slate-800">
               {MONTH_NAMES[viewMonth]}
             </span>
-            <select
-              value={viewYear}
-              onChange={(e) => setViewYear(parseInt(e.target.value, 10))}
-              className="font-semibold text-xs sm:text-sm text-slate-800 bg-transparent border-0 outline-none cursor-pointer hover:text-telkom-navy"
+            <button
+              type="button"
+              onClick={() => setIsYearPickerOpen((prev) => !prev)}
+              className={cn(
+                "inline-flex items-center gap-1 font-semibold text-xs sm:text-sm px-2 py-0.5 rounded-md transition-colors cursor-pointer border border-transparent select-none",
+                isYearPickerOpen
+                  ? "bg-telkom-navy text-white hover:bg-telkom-navy shadow-2xs"
+                  : "text-slate-800 hover:bg-slate-100 hover:text-telkom-navy"
+              )}
+              title="Pilih tahun"
             >
-              {yearOptions.map((y) => (
-                <option key={y} value={y}>
-                  {y}
-                </option>
-              ))}
-            </select>
+              <span>{viewYear}</span>
+              <ChevronDown
+                className={cn(
+                  "h-3 w-3 text-slate-400 transition-transform duration-100",
+                  isYearPickerOpen && "rotate-180 text-white"
+                )}
+              />
+            </button>
           </div>
 
           <button
@@ -221,82 +237,138 @@ export function DatePicker({
           </button>
         </div>
 
-        {/* Day of Week Labels */}
-        <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
-          {DAY_LABELS.map((day) => (
-            <span
-              key={day}
-              className="text-[11px] font-semibold text-slate-400 select-none py-1"
-            >
-              {day}
-            </span>
-          ))}
-        </div>
-
-        {/* Days Grid */}
-        <div className="grid grid-cols-7 gap-1 text-center select-none">
-          {/* Previous month padding days */}
-          {Array.from({ length: firstDayIndex }).map((_, i) => {
-            const dayNum = daysInPrevMonth - firstDayIndex + i + 1;
-            return (
-              <div
-                key={`prev-${i}`}
-                className="h-8 flex items-center justify-center text-xs text-slate-300 font-normal pointer-events-none"
-              >
-                {dayNum}
-              </div>
-            );
-          })}
-
-          {/* Current month days */}
-          {Array.from({ length: daysInCurrentMonth }).map((_, i) => {
-            const dayNum = i + 1;
-            const isSelected =
-              parsedDate &&
-              parsedDate.getFullYear() === viewYear &&
-              parsedDate.getMonth() === viewMonth &&
-              parsedDate.getDate() === dayNum;
-            const isToday = isTodayMonth && todayDate === dayNum;
-
-            return (
+        {isYearPickerOpen ? (
+          <div className="py-1">
+            <div className="flex items-center justify-between mb-2 px-1">
+              <span className="text-xs font-semibold text-slate-500">Pilih Tahun</span>
               <button
-                key={`current-${dayNum}`}
                 type="button"
-                onClick={() => handleSelectDay(dayNum)}
-                className={cn(
-                  "h-8 w-8 mx-auto flex items-center justify-center text-xs rounded-lg transition-all cursor-pointer font-medium",
-                  isSelected
-                    ? "bg-telkom-navy text-white font-semibold shadow-xs hover:bg-telkom-navy"
-                    : isToday
-                    ? "border border-telkom-navy/40 text-telkom-navy font-semibold hover:bg-slate-100"
-                    : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
-                )}
+                onClick={() => setIsYearPickerOpen(false)}
+                className="text-xs font-medium text-telkom-navy hover:underline cursor-pointer"
               >
-                {dayNum}
+                Kembali ke Kalender
               </button>
-            );
-          })}
-        </div>
+            </div>
+            <div className="grid grid-cols-4 gap-1.5 max-h-[220px] overflow-y-auto hide-scrollbar p-0.5">
+              {yearOptions.map((y) => {
+                const isSelectedYear = y === viewYear;
+                const isSystemYear = y === currentYear;
+                return (
+                  <button
+                    key={y}
+                    type="button"
+                    onClick={() => {
+                      setViewYear(y);
+                      setIsYearPickerOpen(false);
+                    }}
+                    className={cn(
+                      "h-9 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center border-0 outline-none select-none",
+                      isSelectedYear
+                        ? "bg-telkom-navy text-white shadow-xs font-bold"
+                        : isSystemYear
+                        ? "border border-telkom-navy/40 text-telkom-navy hover:bg-slate-100 font-semibold"
+                        : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    )}
+                  >
+                    {y}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Day of Week Labels */}
+            <div className="grid grid-cols-7 gap-1 text-center mb-1.5">
+              {DAY_LABELS.map((day) => (
+                <span
+                  key={day}
+                  className="text-[11px] font-semibold text-slate-400 select-none py-1"
+                >
+                  {day}
+                </span>
+              ))}
+            </div>
 
-        {/* Footer Shortcuts */}
-        <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 px-1">
-          <button
-            type="button"
-            onClick={handleSelectToday}
-            className="text-xs font-semibold text-telkom-navy hover:underline cursor-pointer"
-          >
-            Hari Ini
-          </button>
-          {displayLabel && (
-            <button
-              type="button"
-              onClick={handleClear}
-              className="text-xs font-medium text-slate-500 hover:text-red-600 transition-colors cursor-pointer"
-            >
-              Kosongkan
-            </button>
-          )}
-        </div>
+            {/* Days Grid */}
+            <div className="grid grid-cols-7 gap-1 text-center select-none">
+              {/* Previous month padding days */}
+              {Array.from({ length: firstDayIndex }).map((_, i) => {
+                const dayNum = daysInPrevMonth - firstDayIndex + i + 1;
+                return (
+                  <div
+                    key={`prev-${i}`}
+                    className="h-8 flex items-center justify-center text-xs text-slate-300 font-normal pointer-events-none"
+                  >
+                    {dayNum}
+                  </div>
+                );
+              })}
+
+              {/* Current month days */}
+              {Array.from({ length: daysInCurrentMonth }).map((_, i) => {
+                const dayNum = i + 1;
+                const isSelected =
+                  parsedDate &&
+                  parsedDate.getFullYear() === viewYear &&
+                  parsedDate.getMonth() === viewMonth &&
+                  parsedDate.getDate() === dayNum;
+                const isToday = isTodayMonth && todayDate === dayNum;
+
+                return (
+                  <button
+                    key={`current-${dayNum}`}
+                    type="button"
+                    onClick={() => handleSelectDay(dayNum)}
+                    className={cn(
+                      "h-8 w-8 mx-auto flex items-center justify-center text-xs rounded-lg transition-all cursor-pointer font-medium border-0 outline-none",
+                      isSelected
+                        ? "bg-telkom-navy text-white font-semibold shadow-xs hover:bg-telkom-navy"
+                        : isToday
+                        ? "border border-telkom-navy/40 text-telkom-navy font-semibold hover:bg-slate-100"
+                        : "text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+                    )}
+                  >
+                    {dayNum}
+                  </button>
+                );
+              })}
+
+              {/* Next month padding days to maintain consistent 6-row height */}
+              {Array.from({ length: 42 - (firstDayIndex + daysInCurrentMonth) }).map((_, i) => {
+                const dayNum = i + 1;
+                return (
+                  <div
+                    key={`next-${i}`}
+                    className="h-8 flex items-center justify-center text-xs text-slate-300 font-normal pointer-events-none"
+                  >
+                    {dayNum}
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Footer Shortcuts */}
+            <div className="flex items-center justify-between pt-3 mt-2 border-t border-slate-100 px-1">
+              <button
+                type="button"
+                onClick={handleSelectToday}
+                className="text-xs font-semibold text-telkom-navy hover:underline cursor-pointer"
+              >
+                Hari Ini
+              </button>
+              {displayLabel && (
+                <button
+                  type="button"
+                  onClick={handleClear}
+                  className="text-xs font-medium text-slate-500 hover:text-red-600 transition-colors cursor-pointer"
+                >
+                  Kosongkan
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </PopoverContent>
     </Popover>
   );

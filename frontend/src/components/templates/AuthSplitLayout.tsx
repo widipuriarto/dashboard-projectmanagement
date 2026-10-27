@@ -58,7 +58,7 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
             x: isTransitioning ? -30 : 0,
             filter: isTransitioning ? "blur(3px)" : "blur(0px)",
           }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+          transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
           className="w-full max-w-[390px] pt-4 sm:pt-6 flex justify-center shrink-0"
         >
           <img
@@ -76,7 +76,7 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
                 initial={{ opacity: 0, y: 15 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, x: -30, filter: "blur(3px)" }}
-                transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
+                transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
                 className="w-full flex flex-col"
               >
                 {children}
@@ -94,7 +94,7 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
         </div>
       </div>
 
-      {/* Right Column: Visual Artwork Canvas (Matches exact 16px margin and 12px radius of main layout, border-free) */}
+      {/* Right Column: Visual Artwork Canvas (Staged Transition: White/Blue rise to 50/50, then expand left while blue dominates) */}
       <motion.div
         initial={false}
         animate={
@@ -129,7 +129,8 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
         transition={
           isTransitioning
             ? {
-                duration: 0.5,
+                duration: 0.75, // Phase 2: Slower, majestic horizontal expansion to the left
+                delay: 0.6,     // Begins expanding only after Phase 1 (0.6s) reaches 50/50 coverage
                 ease: [0.16, 1, 0.3, 1],
               }
             : {
@@ -149,12 +150,8 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
           !isDesktop && !isTransitioning && "pointer-events-none"
         )}
       >
-        {/* Container for Artwork, Bottom Gradient Overlay & Title/Unit Typography */}
-        <motion.div
-          animate={{ opacity: isTransitioning ? 0 : 1 }}
-          transition={{ duration: 0.35, ease: "easeOut" }}
-          className="relative w-full h-full flex flex-col justify-end p-8 sm:p-10 select-none"
-        >
+        {/* Interior Container */}
+        <div className="relative w-full h-full flex flex-col justify-end p-8 sm:p-10 select-none overflow-hidden">
           {/* Artwork Image filling the entire card */}
           <img
             src={signImg}
@@ -162,21 +159,50 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
             className="absolute inset-0 w-full h-full object-cover select-none pointer-events-none"
           />
 
-          {/* Elevated Light Blue Gradient Overlay covering the lower portion of the image */}
-          <div className="absolute inset-x-0 bottom-0 h-3/5 bg-gradient-to-t from-slate-200 from-20% via-slate-200/80 via-60% to-transparent pointer-events-none" />
+          {/* Staged Gradient Canvas:
+              - 0% to 33.3%: Resting state (transparent top, soft white bottom)
+              - 33.3% to 66.6%: Phase 1 (50% white top, seamless gradient blend, 50% light-blue bottom)
+              - 66.6% to 100%: Phase 2 (100% solid light-blue #e2e8f0 taking over completely)
+          */}
+          <motion.div
+            initial={false}
+            animate={
+              isTransitioning
+                ? { y: ["0%", "-33.33%", "-66.66%"] }
+                : { y: "0%" }
+            }
+            transition={
+              isTransitioning
+                ? {
+                    duration: 1.35, // Slower total gradient rise (0.6s Phase 1 + 0.75s Phase 2)
+                    times: [0, 0.444, 1.0], // Reaches 50/50 split at exactly 0.6s (0.6 / 1.35 = 0.444)
+                    ease: ["easeInOut", "easeInOut"],
+                  }
+                : { duration: 0 }
+            }
+            style={{
+              height: "300%",
+              background:
+                "linear-gradient(to bottom, transparent 0%, transparent 12%, rgba(255, 255, 255, 0.85) 24%, #ffffff 33.33%, #ffffff 38%, #e2e8f0 60%, #e2e8f0 100%)",
+            }}
+            className="absolute inset-x-0 top-0 pointer-events-none z-10"
+          />
 
-          {/* Bottom Branding & Title Typography */}
-          <div className="relative z-10 space-y-1">
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+          {/* Bottom Branding & Title Typography: Resting on clean white gradient, fades out on submit */}
+          <motion.div
+            animate={{ opacity: isTransitioning ? 0 : 1 }}
+            transition={{ duration: 0.25 }}
+            className="relative z-20 space-y-1"
+          >
+            <h2 className="text-xl sm:text-2xl font-bold text-telkom-navy tracking-tight leading-tight">
               Project Management System
             </h2>
             <p className="text-xs sm:text-sm font-medium text-slate-600">
               Regional Solutions & Operations 1 • Telkom Regional 3
             </p>
-          </div>
-        </motion.div>
+          </motion.div>
+        </div>
       </motion.div>
     </div>
   );
 }
-

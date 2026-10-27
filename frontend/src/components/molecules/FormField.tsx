@@ -7,6 +7,7 @@ interface FormFieldProps {
   lockIcon?: boolean;
   colSpan?: 1 | 2;
   error?: string;
+  topError?: string;
   hint?: string;
   children: React.ReactNode;
   className?: string;
@@ -18,6 +19,7 @@ export function FormField({
   lockIcon = false,
   colSpan = 1,
   error,
+  topError,
   hint,
   children,
   className,
@@ -47,7 +49,13 @@ export function FormField({
             </span>
           )}
         </label>
-        {hint && <span className="text-[11px] text-slate-400 font-normal">{hint}</span>}
+        {topError ? (
+          <span className="text-[11px] font-medium text-telkom-red animate-in fade-in duration-150">
+            {topError}
+          </span>
+        ) : hint ? (
+          <span className="text-[11px] text-slate-400 font-normal">{hint}</span>
+        ) : null}
       </div>
 
       <div>{children}</div>

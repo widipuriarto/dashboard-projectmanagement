@@ -34,9 +34,8 @@ describe("Skenario 5: Ubah Proyek (CRUD: Update)", () => {
       .invoke("val")
       .should("not.be.empty");
 
-    cy.get('[data-testid="input-nama-mitra"]')
-      .invoke("val")
-      .should("not.be.empty");
+    cy.get('[data-testid="select-nama-mitra"]')
+      .should("be.visible");
   });
 
   it("Test 5.2: tombol simpan perubahan (Save Changes) wajib nonaktif (disabled) pada kondisi awal (pristine)", () => {

@@ -55,7 +55,12 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
         )}
       >
         {prefix && (
-          <span className="flex items-center justify-center pl-3 pr-2 text-xs font-semibold text-slate-400 select-none">
+          <span
+            className={cn(
+              "flex items-center justify-center pl-3 pr-2 text-xs font-semibold select-none transition-colors",
+              displayValue ? "text-slate-800" : "text-slate-400"
+            )}
+          >
             {prefix}
           </span>
         )}

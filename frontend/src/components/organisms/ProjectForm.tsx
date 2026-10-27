@@ -13,6 +13,8 @@ import {
 import {
   type ProjectFormData,
   mapInitialFormData,
+  getWitelCode,
+  getPmBySegment,
   ProjectFormBasicInfo,
   ProjectFormContract,
   ProjectFormDelivery,
@@ -111,17 +113,17 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
     // Reactive dynamic project_id_pm generation
     const generatedProjectId = React.useMemo(() => {
       const y = formData.tahun_kontrak || "YYYY";
-      const w = formData.witel || "WITEL";
+      const w = getWitelCode(formData.witel);
       const s = formData.segment || "SEGMENT";
       return `${y}-${w}-${s}-${activeProjectSeq}`;
     }, [formData.tahun_kontrak, formData.witel, formData.segment, activeProjectSeq]);
 
     // Calculate live SLA days preview if dates are entered
     const liveSlaDays = React.useMemo(() => {
-      if (!formData.tanggal_request_dr || !formData.tanggal_close_dr) return "-";
+      if (!formData.tanggal_request_dr || !formData.tanggal_close_dr) return "";
       const req = new Date(formData.tanggal_request_dr);
       const close = new Date(formData.tanggal_close_dr);
-      if (isNaN(req.getTime()) || isNaN(close.getTime())) return "-";
+      if (isNaN(req.getTime()) || isNaN(close.getTime())) return "";
       const diff = Math.ceil(Math.abs(close.getTime() - req.getTime()) / (1000 * 60 * 60 * 24));
       return `${diff} Hari`;
     }, [formData.tanggal_request_dr, formData.tanggal_close_dr]);
@@ -164,7 +166,14 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
     }, [isDirty, isSubmitting]);
 
     const updateField = (key: keyof ProjectFormData, value: any) => {
-      setFormData((prev) => ({ ...prev, [key]: value }));
+      setFormData((prev) => {
+        const next = { ...prev, [key]: value };
+        // Auto-fill PM based on selected Segment (If DGS: Filipus Tito, else: Achadin)
+        if (key === "segment") {
+          next.pm = getPmBySegment(value);
+        }
+        return next;
+      });
       if (errors[key]) {
         setErrors((prev) => {
           const next = { ...prev };
@@ -173,6 +182,18 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         });
       }
     };
+
+    const setFieldError = React.useCallback((field: string, error: string | null) => {
+      setErrors((prev) => {
+        if (!error) {
+          if (!prev[field]) return prev;
+          const next = { ...prev };
+          delete next[field];
+          return next;
+        }
+        return { ...prev, [field]: error };
+      });
+    }, []);
 
     const handleAttemptCancel = () => {
       if (isDirty) {
@@ -192,12 +213,22 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
 
     if (!formData.segment) errs.segment = "Segmen wajib dipilih";
     if (!formData.witel) errs.witel = "Witel wajib dipilih";
-    if (!formData.nama_proyek.trim()) errs.nama_proyek = "Nama Proyek wajib diisi";
+    if (!formData.nama_proyek.trim()) errs.nama_proyek = "Nama Project wajib diisi";
     if (!formData.nama_pelanggan.trim()) errs.nama_pelanggan = "Nama Pelanggan wajib diisi";
     if (!formData.nama_mitra.trim()) errs.nama_mitra = "Nama Mitra wajib diisi";
-    if (!formData.tahun_kontrak) errs.tahun_kontrak = "Tahun Proyek wajib diisi";
+    if (!formData.tahun_kontrak) errs.tahun_kontrak = "Tahun Kontrak wajib diisi";
     if (!formData.status_email_handover) errs.status_email_handover = "Status Email Handover wajib dipilih";
     if (!formData.status_dokumen_obl) errs.status_dokumen_obl = "Status Dokumen OBL wajib dipilih";
+
+    if (formData.no_order.trim() && !/^1-\d{11}$/.test(formData.no_order.trim())) {
+      errs.no_order = "No Order wajib 1-(11 digit)";
+    }
+    if (formData.sid.trim() && !/^\d{10}$/.test(formData.sid.trim())) {
+      errs.sid = "SID wajib 10 digit";
+    }
+    if (formData.id_digireview.trim() && !/^\d{6}$/.test(formData.id_digireview.trim())) {
+      errs.id_digireview = "ID DIGIREVIEW wajib 6 digit";
+    }
 
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -225,7 +256,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
           nama_mitra: formData.nama_mitra.trim(),
           pm: formData.pm || null,
           idlop: formData.idlop.trim() || null,
-          status_email_handover: formData.status_email_handover === "OK",
+          status_email_handover: formData.status_email_handover || null,
           note_email_handover: formData.note_email_handover.trim() || null,
           status_dokumen_obl: formData.status_dokumen_obl || null,
           jenis_kontrak: formData.jenis_kontrak || null,
@@ -341,7 +372,8 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         console.error("Failed to update highest sequence in localStorage", e);
       }
 
-      const finalProjectId = `${formData.tahun_kontrak || "YYYY"}-${formData.witel || "WITEL"}-${formData.segment || "SEGMENT"}-${finalSeqStr}`;
+      const witelCode = getWitelCode(formData.witel);
+      const finalProjectId = `${formData.tahun_kontrak || "YYYY"}-${witelCode}-${formData.segment || "SEGMENT"}-${finalSeqStr}`;
 
       // Determine next sequential nomor (strictly monotonic forward)
       let maxNomor = 0;
@@ -380,7 +412,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         nama_mitra: formData.nama_mitra.trim(),
         pm: formData.pm || null,
         idlop: formData.idlop.trim() || null,
-        status_email_handover: formData.status_email_handover === "OK",
+        status_email_handover: formData.status_email_handover || null,
         note_email_handover: formData.note_email_handover.trim() || null,
         status_dokumen_obl: formData.status_dokumen_obl || null,
         jenis_kontrak: formData.jenis_kontrak || null,
@@ -523,12 +555,16 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         <ProjectFormDelivery
           formData={formData}
           updateField={updateField}
+          errors={errors}
+          setFieldError={setFieldError}
         />
 
         <ProjectFormBast
           formData={formData}
           updateField={updateField}
           liveSlaDays={liveSlaDays}
+          errors={errors}
+          setFieldError={setFieldError}
         />
 
         <ProjectFormStatus

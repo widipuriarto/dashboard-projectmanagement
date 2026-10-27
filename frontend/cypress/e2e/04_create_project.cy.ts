@@ -46,18 +46,18 @@ describe("Skenario 4: Tambah Proyek Baru (CRUD: Create)", () => {
     // 2. Masukkan Tahun Kontrak
     cy.get('[data-testid="input-tahun-kontrak"]').clear().type("2027");
 
-    // 3. Pilih Witel SJU
+    // 3. Pilih Witel SMG JATENG UTARA
     cy.get('[data-testid="select-witel"]').click();
-    cy.get('[data-testid="select-option-SJU"]').click();
+    cy.get('[data-testid="select-option-SMG JATENG UTARA"]').click();
 
-    // 4. Pilih Segmen DES
+    // 4. Pilih Segmen DPS
     cy.get('[data-testid="select-segment"]').click();
-    cy.get('[data-testid="select-option-DES"]').click();
+    cy.get('[data-testid="select-option-DPS"]').click();
 
-    // 5. Verifikasi nilai ID PROJECT PM ter-update otomatis dengan format semantik 2027-SJU-DES-XXX
+    // 5. Verifikasi nilai ID PROJECT PM ter-update otomatis dengan format semantik 2027-SMG-DPS-XXX
     cy.get('[data-testid="input-project-id-pm"]')
       .invoke("val")
-      .should("match", /^2027-SJU-DES-\d{3}$/);
+      .should("match", /^2027-SMG-DPS-\d{3}$/);
   });
 
   it("Test 4.4: harus memformat input mata uang (CurrencyInput) dengan pemisah ribuan", () => {
@@ -86,11 +86,11 @@ describe("Skenario 4: Tambah Proyek Baru (CRUD: Create)", () => {
 
     // Field 2: Witel
     cy.get('[data-testid="select-witel"]').click();
-    cy.get('[data-testid="select-option-SJU"]').click();
+    cy.get('[data-testid="select-option-SMG JATENG UTARA"]').click();
 
     // Field 3: Segmen
     cy.get('[data-testid="select-segment"]').click();
-    cy.get('[data-testid="select-option-DES"]').click();
+    cy.get('[data-testid="select-option-DPS"]').click();
 
     // Field 4: Nama Proyek
     cy.get('[data-testid="input-nama-proyek"]').type(testProjectName);
@@ -99,7 +99,8 @@ describe("Skenario 4: Tambah Proyek Baru (CRUD: Create)", () => {
     cy.get('[data-testid="input-nama-pelanggan"]').type(testCustomer);
 
     // Field 6: Nama Mitra
-    cy.get('[data-testid="input-nama-mitra"]').type(testPartner);
+    cy.get('[data-testid="select-nama-mitra"]').click();
+    cy.get('[data-testid="select-option-TELKOMSEL"]').click();
 
     // Field 7: Status Email Handover
     cy.get('[data-testid="select-status-email-handover"]').click();
@@ -107,7 +108,7 @@ describe("Skenario 4: Tambah Proyek Baru (CRUD: Create)", () => {
 
     // Field 8: Status Dokumen OBL
     cy.get('[data-testid="select-status-dokumen-obl"]').click();
-    cy.contains("button", "NOPES/KL OK").click();
+    cy.contains("button", "KL/NOPES OK").click();
 
     // 3. Isi data pendukung (Nilai Kontrak)
     cy.get('[data-testid="input-nilai-kontrak-obl"]').type("250000000");

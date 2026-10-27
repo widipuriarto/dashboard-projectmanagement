@@ -50,16 +50,20 @@ export function CustomSelect({
       return opt;
     });
 
+    if (value && !mapped.some((o) => o.value === value)) {
+      mapped.push({ value, label: value });
+    }
+
     if (allowClear && !mapped.some((o) => o.value === "")) {
       return [{ value: "", label: placeholder }, ...mapped];
     }
 
     return mapped;
-  }, [options, allowClear, placeholder]);
+  }, [options, allowClear, placeholder, value]);
 
   const selectedOption = React.useMemo(() => {
     if (!value) return null;
-    return normalizedOptions.find((opt) => opt.value === value);
+    return normalizedOptions.find((opt) => opt.value === value) || { value, label: value };
   }, [normalizedOptions, value]);
 
   // Synchronize dropdown width with trigger button width on open
@@ -184,7 +188,7 @@ export function CustomSelect({
         </span>
         <ChevronDown
           className={cn(
-            "h-4 w-4 text-slate-400 shrink-0 transition-transform duration-200",
+            "h-4 w-4 text-slate-400 shrink-0 transition-transform duration-100",
             isOpen && "rotate-180 text-telkom-navy"
           )}
         />
@@ -196,7 +200,7 @@ export function CustomSelect({
         sideOffset={4}
         onKeyDown={handleKeyDown}
         style={{ width: menuWidth ? `${menuWidth}px` : "auto", minWidth: menuWidth ? `${menuWidth}px` : "180px" }}
-        className="p-1.5 rounded-xl border-none bg-white shadow-xl max-h-64 overflow-y-auto space-y-0.5 z-50 duration-150 [scrollbar-width:thin]"
+        className="p-1.5 rounded-xl border-none bg-white shadow-xl max-h-64 overflow-y-auto space-y-0.5 z-50 duration-75 hide-scrollbar"
       >
         {normalizedOptions.map((opt, idx) => {
           const isSelected = opt.value === (value || "");
@@ -214,17 +218,26 @@ export function CustomSelect({
               onClick={() => handleSelect(opt.value)}
               onMouseEnter={() => setHighlightedIndex(idx)}
               className={cn(
-                "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left transition-colors cursor-pointer select-none",
+                "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left transition-colors cursor-pointer select-none border-0 border-none outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0",
                 isSelected
                   ? "bg-telkom-navy/10 text-telkom-navy font-semibold"
                   : isHighlighted
                   ? "bg-slate-100 text-slate-900 font-medium"
                   : isClearOpt
-                  ? "text-slate-400 hover:bg-slate-100 hover:text-slate-700 font-normal"
+                  ? "text-slate-400 hover:bg-slate-100 hover:text-slate-900 font-normal"
                   : "text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium"
               )}
             >
-              <span className={cn("truncate mr-2", isClearOpt && "text-slate-400 font-normal")}>
+              <span
+                className={cn(
+                  "truncate mr-2",
+                  isClearOpt
+                    ? isHighlighted
+                      ? "text-slate-900 font-medium"
+                      : "text-slate-400 font-normal"
+                    : ""
+                )}
+              >
                 {opt.label}
               </span>
               {isSelected && <Check className="h-4 w-4 text-telkom-navy shrink-0" />}

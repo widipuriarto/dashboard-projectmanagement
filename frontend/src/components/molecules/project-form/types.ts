@@ -82,17 +82,18 @@ export const INITIAL_FORM_DATA: ProjectFormData = {
 
 export function mapInitialFormData(data?: ProjectPM | null): ProjectFormData {
   if (!data) return INITIAL_FORM_DATA;
-  let emailHandover = "";
-  if (data.status_email_handover === true || data.status_email_handover === "OK") {
-    emailHandover = "OK";
-  } else if (data.status_email_handover === false || data.status_email_handover === "NOK") {
-    emailHandover = "NOK";
-  }
 
   const sanitizeDate = (val?: string | null) => {
     if (!val) return "";
     return String(val).split("T")[0];
   };
+
+  const emailHandover =
+    data.status_email_handover === true
+      ? "OK"
+      : data.status_email_handover === false
+      ? "NOK"
+      : data.status_email_handover || "";
 
   return {
     project_id_pm: data.project_id_pm || "",
@@ -102,7 +103,7 @@ export function mapInitialFormData(data?: ProjectPM | null): ProjectFormData {
     nama_proyek: data.nama_proyek || "",
     nama_pelanggan: data.nama_pelanggan || "",
     nama_mitra: data.nama_mitra || "",
-    pm: data.pm || "",
+    pm: data.segment ? getPmBySegment(data.segment) : (data.pm || ""),
     idlop: data.idlop || "",
     status_email_handover: emailHandover,
     status_dokumen_obl: data.status_dokumen_obl || "",
@@ -135,9 +136,62 @@ export function mapInitialFormData(data?: ProjectPM | null): ProjectFormData {
   };
 }
 
-export const WITEL_OPTIONS: readonly string[] = ["SJU", "YJS", "SJT"] as const;
-export const SEGMENT_OPTIONS: readonly string[] = ["SME", "DBS", "DGS", "DES", "DPS", "DSS"] as const;
-export const PM_OPTIONS: readonly string[] = ["Hagia", "Anggi", "Adin", "Tito"] as const;
+export const getWitelCode = (witel?: string | null): string => {
+  if (!witel) return "WITEL";
+  const trimmed = witel.trim();
+  if (!trimmed) return "WITEL";
+  // Extract first 3 characters in uppercase (e.g., "SMG JATENG UTARA" -> "SMG")
+  return trimmed.slice(0, 3).toUpperCase();
+};
+
+export const WITEL_OPTIONS: readonly string[] = [
+  "SMG JATENG UTARA",
+  "SLO JATENG TIMUR",
+  "YOG JATENG SELATAN",
+] as const;
+
+export const SEGMENT_OPTIONS: readonly string[] = [
+  "DGS",
+  "DPS",
+  "DSS",
+  "SME",
+] as const;
+
+export const NAMA_MITRA_OPTIONS: readonly string[] = [
+  "DESNET",
+  "DIGISERVE",
+  "GRATIKA",
+  "INDOSAT",
+  "KOPEGTEL SOLO",
+  "KOPERASI KARYAWAN SMARTMEDIA",
+  "KOPERASI METROPOLITAN",
+  "KOPERASI SMART",
+  "MEDIA SARANA DATA",
+  "MITRA INOVASI JAYANTARA",
+  "PT. ADMINISTRASI MEDIKA",
+  "PT. DIGITAL APLIKASI SOLUSI",
+  "PT. FINNET INDONESIA",
+  "PT. INFOMEDIA NUSANTARA",
+  "PT. JALIN MAYANTARA INDONESIA",
+  "PT. METRA DIGITAL MEDIA",
+  "PT. METRA-NET",
+  "PT. PINS INDONESIA",
+  "PT. SIGMA CIPTA CARAKA",
+  "PT. SISTELINDO MITRALINTAS",
+  "PT. TELKOM AKSES",
+  "PT. TELKOM DATA EKOSISTEM",
+  "PT. TELKOM PRIMA CIPTA CERTIFIA",
+  "PT. TELKOM SATELIT INDONESIA",
+  "SISINDOKOM",
+  "SSH",
+  "TELKOMSEL",
+] as const;
+export const getPmBySegment = (segment?: string | null): string => {
+  if (!segment) return "";
+  return segment.trim().toUpperCase() === "DGS" ? "Filipus Tito" : "Achadin";
+};
+
+export const PM_OPTIONS: readonly string[] = ["Filipus Tito", "Achadin"] as const;
 export const JENIS_KONTRAK_OPTIONS: readonly string[] = [
   "KL",
   "SP",
@@ -148,16 +202,18 @@ export const JENIS_KONTRAK_OPTIONS: readonly string[] = [
   "NOPES Amandemen",
 ] as const;
 export const STATUS_OBL_OPTIONS: readonly string[] = [
-  "NOPES/KL OK",
-  "OBL Dalam Proses",
-  "OBL Non DR",
+  "KL/NOPES OK",
+  "IN PROCESS",
   "P8 OK",
-  "Drafting",
 ] as const;
 export const STATUS_DELIVERY_OPTIONS: readonly string[] = [
   "Delivered",
-  "Dalam Proses Delivery",
-  "Belum Terlaksana",
+  "In Process",
+  "Hold",
+] as const;
+export const JENIS_DOK_DELIVERY_OPTIONS: readonly string[] = [
+  "BAST",
+  "BAPL",
 ] as const;
 export const STATUS_DOK_DELIVERY_OPTIONS: readonly string[] = [
   "01 Closed",
@@ -165,19 +221,19 @@ export const STATUS_DOK_DELIVERY_OPTIONS: readonly string[] = [
   "03 DR/Drafting",
   "04 Evidence",
   "05 Delivery NOK",
-  "06 Non DR",
 ] as const;
 export const HARDFILE_BAST_OPTIONS: readonly string[] = [
-  "ADA",
-  "TIDAK ADA",
-  "PROSES",
-  "NON DR",
-  "BAST WITEL",
+  "DONE",
+  "IN PROCESS",
 ] as const;
 export const STATUS_ORDER_OPTIONS: readonly string[] = [
-  "00 BC",
-  "01 Pending BASO",
-  "02 Closing PJM (BIMA)",
+  "01 BC",
+  "02 Pending BASO",
+  "03 Prov Issue",
+] as const;
+export const STATUS_GR_OPTIONS: readonly string[] = [
+  "DONE",
+  "IN PROCESS",
 ] as const;
 
 export type FormFieldUpdater = <K extends keyof ProjectFormData>(

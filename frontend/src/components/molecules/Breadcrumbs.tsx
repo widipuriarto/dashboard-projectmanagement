@@ -80,7 +80,7 @@ export default function Breadcrumbs() {
       </button>
 
       {/* Vertical Subtle Divider */}
-      <div className="h-4 w-[1px] bg-slate-200 shrink-0" aria-hidden="true" />
+      <div className="h-4 w-[1px] bg-slate-300 rounded-full shrink-0" aria-hidden="true" />
 
       {/* Breadcrumb Navigation Trail */}
       <nav aria-label="Breadcrumb" className="min-w-0">

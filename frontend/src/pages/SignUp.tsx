@@ -23,10 +23,10 @@ export default function SignUp() {
     setIsSubmitting(true);
     setIsTransitioning(true);
 
-    // Transition card to match exactly the main container of the dashboard
+    // Transition card to match exactly the main container of the dashboard (Phase 1 50/50 blend + Phase 2 blue expansion)
     setTimeout(() => {
       navigate("/");
-    }, 520);
+    }, 1400);
   };
 
   return (
@@ -127,7 +127,7 @@ export default function SignUp() {
             type="submit"
             data-testid="button-signup-submit"
             disabled={isSubmitting}
-            className="w-full h-11 rounded-lg bg-telkom-navy hover:bg-telkom-navy/90 text-white font-medium text-sm shadow-sm transition-all active:scale-[0.99] cursor-pointer mt-2"
+            className="w-full h-11 rounded-lg bg-telkom-navy hover:bg-telkom-navy/90 text-white font-medium text-sm transition-all active:scale-[0.99] cursor-pointer mt-2"
           >
             {isSubmitting ? (
               <div className="flex items-center gap-2">

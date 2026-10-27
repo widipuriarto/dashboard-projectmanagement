@@ -19,7 +19,7 @@ export function FormSection({
   return (
     <section className={cn("space-y-4 w-full", className)}>
       {/* Section Header */}
-      <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+      <div className="flex items-center justify-between border-b-1 border-slate-200 pb-2.5">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold uppercase tracking-wider text-telkom-navy select-none">
