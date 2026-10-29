@@ -1,19 +1,18 @@
 import * as React from "react";
 import { Database } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { UnsavedChangesModal } from "@/components/molecules/UnsavedChangesModal";
 import { useNavigationGuard } from "@/context/NavigationGuardContext";
 import { useToast } from "@/context/ToastContext";
 import { supabase } from "@/lib/supabase";
-import {
-  STORAGE_KEY_HIGHEST_SEQ,
-  STORAGE_KEY_HIGHEST_NOMOR,
-  type ProjectPM,
-} from "./columns";
+import { serializeOrdersData, isUrl } from "@/lib/orderParser";
+import type { OrdersData } from "@/types/orders";
+import type { ProjectPM } from "@/types/project";
+import { useProjectSequence } from "@/hooks/useProjectSequence";
 import {
   type ProjectFormData,
   mapInitialFormData,
-  getWitelCode,
   getPmBySegment,
   ProjectFormBasicInfo,
   ProjectFormContract,
@@ -23,14 +22,13 @@ import {
 } from "@/components/molecules/project-form";
 
 export type { ProjectFormData };
-export { mapInitialFormData };
 
 interface ProjectFormProps {
   mode?: "create" | "edit";
   initialData?: ProjectPM | null;
   onCancel: () => void;
-  onSuccess: (newProject: any) => void;
-  existingProjects?: any[];
+  onSuccess: (newProject: ProjectPM) => void;
+  existingProjects?: ProjectPM[];
 }
 
 export interface ProjectFormHandle {
@@ -65,58 +63,14 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
       setHasSubmitAttempted(false);
     }, [initialData]);
 
-    // Compute next sequential project index from existing projects and high-water mark (for Create mode)
-    const nextProjectSeq = React.useMemo(() => {
-      let max = 0;
-      existingProjects.forEach((p) => {
-        const match = String(p.project_id_pm || "").match(/(\d+)$/);
-        if (match) {
-          const n = parseInt(match[1], 10);
-          if (!isNaN(n) && n > max) max = n;
-        }
-      });
-
-      let storedMax = 0;
-      try {
-        const saved = localStorage.getItem(STORAGE_KEY_HIGHEST_SEQ);
-        if (saved) {
-          const parsed = parseInt(saved, 10);
-          if (!isNaN(parsed) && parsed > storedMax) storedMax = parsed;
-        }
-      } catch (e) {
-        console.error("Failed to read highest sequence from localStorage", e);
-      }
-
-      const effectiveMax = Math.max(max, storedMax);
-      try {
-        if (effectiveMax > storedMax) {
-          localStorage.setItem(STORAGE_KEY_HIGHEST_SEQ, String(effectiveMax));
-        }
-      } catch (e) {
-        console.error("Failed to update highest sequence in localStorage", e);
-      }
-
-      return String(effectiveMax + 1).padStart(3, "0");
-    }, [existingProjects]);
-
-    // In edit mode, retain original sequence number from initialData.project_id_pm
-    const activeProjectSeq = React.useMemo(() => {
-      if (isEditMode && initialData?.project_id_pm) {
-        const match = String(initialData.project_id_pm).match(/(\d+)$/);
-        if (match) {
-          return match[1];
-        }
-      }
-      return nextProjectSeq;
-    }, [isEditMode, initialData, nextProjectSeq]);
-
-    // Reactive dynamic project_id_pm generation
-    const generatedProjectId = React.useMemo(() => {
-      const y = formData.tahun_kontrak || "YYYY";
-      const w = getWitelCode(formData.witel);
-      const s = formData.segment || "SEGMENT";
-      return `${y}-${w}-${s}-${activeProjectSeq}`;
-    }, [formData.tahun_kontrak, formData.witel, formData.segment, activeProjectSeq]);
+    const { generatedProjectId, allocateCredentials } = useProjectSequence({
+      existingProjects,
+      initialData,
+      isEditMode,
+      tahunKontrak: formData.tahun_kontrak,
+      witel: formData.witel,
+      segment: formData.segment,
+    });
 
     // Calculate live SLA days preview if dates are entered
     const liveSlaDays = React.useMemo(() => {
@@ -132,6 +86,9 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
     const isDirty = React.useMemo(() => {
       if (isSubmitting) return false;
       return (Object.keys(formData) as Array<keyof ProjectFormData>).some((key) => {
+        if (key === "orders_data") {
+          return JSON.stringify(formData.orders_data || []) !== JSON.stringify(baseInitialData.orders_data || []);
+        }
         const current = formData[key] ?? "";
         const original = baseInitialData[key] ?? "";
         return current !== original;
@@ -165,12 +122,18 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
       return () => window.removeEventListener("beforeunload", handleBeforeUnload);
     }, [isDirty, isSubmitting]);
 
-    const updateField = (key: keyof ProjectFormData, value: any) => {
+    const updateField = <K extends keyof ProjectFormData>(key: K, value: ProjectFormData[K]) => {
       setFormData((prev) => {
         const next = { ...prev, [key]: value };
         // Auto-fill PM based on selected Segment (If DGS: Filipus Tito, else: Achadin)
         if (key === "segment") {
-          next.pm = getPmBySegment(value);
+          next.pm = getPmBySegment(value as string);
+        }
+        // Keep string representations in sync with structured orders_data
+        if (key === "orders_data") {
+          const serialized = serializeOrdersData(value as OrdersData);
+          next.no_order = serialized.no_order;
+          next.sid = serialized.sid;
         }
         return next;
       });
@@ -220,11 +183,24 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
     if (!formData.status_email_handover) errs.status_email_handover = "Status Email Handover wajib dipilih";
     if (!formData.status_dokumen_obl) errs.status_dokumen_obl = "Status Dokumen OBL wajib dipilih";
 
-    if (formData.no_order.trim() && !/^1-\d{11}$/.test(formData.no_order.trim())) {
-      errs.no_order = "No Order wajib 1-(11 digit)";
-    }
-    if (formData.sid.trim() && !/^\d{10}$/.test(formData.sid.trim())) {
-      errs.sid = "SID wajib 10 digit";
+    if (formData.orders_data && formData.orders_data.length > 0) {
+      formData.orders_data.forEach((ord, oIdx) => {
+        const oVal = ord.order_id.trim();
+        if (oVal && !isUrl(oVal) && !/^1-\d{11}$/.test(oVal)) {
+          errs[`order_${oIdx}`] = "No Order wajib format 1-(11 digit)";
+        }
+        ord.sids.forEach((s, sIdx) => {
+          const sVal = s.sid.trim();
+          if (
+            sVal &&
+            !isUrl(sVal) &&
+            !/^1-\d{11}$/.test(sVal) &&
+            !/^\d{10}$/.test(sVal)
+          ) {
+            errs[`sid_${oIdx}_${sIdx}`] = "SID wajib format 1-(11 digit)";
+          }
+        });
+      });
     }
     if (formData.id_digireview.trim() && !/^\d{6}$/.test(formData.id_digireview.trim())) {
       errs.id_digireview = "ID DIGIREVIEW wajib 6 digit";
@@ -245,8 +221,9 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
 
     try {
       if (isEditMode && initialData) {
+        const serializedOrders = serializeOrdersData(formData.orders_data);
         // Construct sanitized payload for Supabase UPDATE
-        const payload: Record<string, any> = {
+        const payload: Record<string, unknown> = {
           project_id_pm: generatedProjectId,
           tahun_kontrak: formData.tahun_kontrak,
           witel: formData.witel,
@@ -264,8 +241,9 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
           tgl_kontrak: formData.tgl_kontrak || null,
           nilai_kontrak_obl: formData.nilai_kontrak_obl,
           quote_number: formData.quote_number.trim() || null,
-          no_order: formData.no_order.trim() || null,
-          sid: formData.sid.trim() || null,
+          no_order: serializedOrders.no_order.trim() || null,
+          sid: serializedOrders.sid.trim() || null,
+          orders_data: formData.orders_data && formData.orders_data.length > 0 ? formData.orders_data : null,
           jenis_layanan: formData.jenis_layanan.trim() || null,
           status_delivery_project: formData.status_delivery_project || null,
           jenis_dok_delivery: formData.jenis_dok_delivery.trim() || null,
@@ -324,84 +302,13 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         return;
       }
 
-      // Query highest project sequence from existing data, DB, and high-water mark
-      let maxProjectSeq = 0;
-      existingProjects.forEach((p) => {
-        const match = String(p.project_id_pm || "").match(/(\d+)$/);
-        if (match) {
-          const n = parseInt(match[1], 10);
-          if (!isNaN(n) && n > maxProjectSeq) maxProjectSeq = n;
-        }
-      });
-
-      try {
-        const { data: latestProjects } = await supabase
-          .from("projects")
-          .select("project_id_pm")
-          .order("created_at", { ascending: false })
-          .limit(30);
-
-        if (latestProjects) {
-          latestProjects.forEach((p) => {
-            const match = String(p.project_id_pm || "").match(/(\d+)$/);
-            if (match) {
-              const n = parseInt(match[1], 10);
-              if (!isNaN(n) && n > maxProjectSeq) maxProjectSeq = n;
-            }
-          });
-        }
-      } catch (seqErr) {
-        console.warn("Could not query latest project sequence, using local maximum", seqErr);
-      }
-
-      try {
-        const savedSeq = localStorage.getItem(STORAGE_KEY_HIGHEST_SEQ);
-        if (savedSeq) {
-          const parsed = parseInt(savedSeq, 10);
-          if (!isNaN(parsed) && parsed > maxProjectSeq) maxProjectSeq = parsed;
-        }
-      } catch (e) {
-        console.error("Failed to read highest sequence from localStorage", e);
-      }
-
-      const finalSeqNum = maxProjectSeq + 1;
-      const finalSeqStr = String(finalSeqNum).padStart(3, "0");
-      try {
-        localStorage.setItem(STORAGE_KEY_HIGHEST_SEQ, String(finalSeqNum));
-      } catch (e) {
-        console.error("Failed to update highest sequence in localStorage", e);
-      }
-
-      const witelCode = getWitelCode(formData.witel);
-      const finalProjectId = `${formData.tahun_kontrak || "YYYY"}-${witelCode}-${formData.segment || "SEGMENT"}-${finalSeqStr}`;
-
-      // Determine next sequential nomor (strictly monotonic forward)
-      let maxNomor = 0;
-      existingProjects.forEach((p) => {
-        const n = typeof p.nomor === "number" ? p.nomor : parseInt(String(p.nomor), 10);
-        if (!isNaN(n) && n > maxNomor) maxNomor = n;
-      });
-
-      try {
-        const savedNomor = localStorage.getItem(STORAGE_KEY_HIGHEST_NOMOR);
-        if (savedNomor) {
-          const parsed = parseInt(savedNomor, 10);
-          if (!isNaN(parsed) && parsed > maxNomor) maxNomor = parsed;
-        }
-      } catch (e) {
-        console.error("Failed to read highest nomor from localStorage", e);
-      }
-
-      const nextNomor = maxNomor + 1;
-      try {
-        localStorage.setItem(STORAGE_KEY_HIGHEST_NOMOR, String(nextNomor));
-      } catch (e) {
-        console.error("Failed to update highest nomor in localStorage", e);
-      }
+      // Allocate next credentials using encapsulated sequence allocator
+      const { finalProjectId, nextNomor } = await allocateCredentials();
 
       // Construct sanitized payload for Supabase projects table
       // Note: waktu_penyelesaian_bast is generated automatically by PostgreSQL
-      const payload: Record<string, any> = {
+      const serializedOrders = serializeOrdersData(formData.orders_data);
+      const payload: Record<string, unknown> = {
         nomor: nextNomor,
         project_id_pm: finalProjectId,
         tahun_kontrak: formData.tahun_kontrak,
@@ -420,8 +327,9 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         tgl_kontrak: formData.tgl_kontrak || null,
         nilai_kontrak_obl: formData.nilai_kontrak_obl,
         quote_number: formData.quote_number.trim() || null,
-        no_order: formData.no_order.trim() || null,
-        sid: formData.sid.trim() || null,
+        no_order: serializedOrders.no_order.trim() || null,
+        sid: serializedOrders.sid.trim() || null,
+        orders_data: formData.orders_data && formData.orders_data.length > 0 ? formData.orders_data : null,
         jenis_layanan: formData.jenis_layanan.trim() || null,
         status_delivery_project: formData.status_delivery_project || null,
         jenis_dok_delivery: formData.jenis_dok_delivery.trim() || null,
@@ -463,16 +371,17 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
       });
 
       if (data && data.length > 0) {
-        onSuccess(data[0]);
+        onSuccess(data[0] as ProjectPM);
       } else {
-        onSuccess(payload);
+        onSuccess(payload as ProjectPM);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Unexpected error saving project:", err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
       showToast({
         type: "error",
         title: "Unexpected Error",
-        description: err.message || String(err),
+        description: errorMsg,
         duration: 5000,
       });
     } finally {
@@ -481,7 +390,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
   };
 
   return (
-    <div className="relative flex flex-col h-full w-full bg-white rounded-lg overflow-hidden isolate">
+    <div className="relative flex flex-col h-full w-full bg-white rounded-md overflow-hidden isolate">
       {/* Centered In-Container Discard Confirmation Modal */}
       <UnsavedChangesModal
         isOpen={isDiscardModalOpen}
@@ -501,23 +410,28 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         }}
       />
 
-      {/* Sticky Header with Breadcrumbs mirroring Navbar style */}
-      <div className="flex items-center justify-between h-14 px-6 border-b border-slate-200 bg-slate-100 sticky top-0 z-20 select-none rounded-t-lg">
+      {/* Sticky Header styled to match Repository Table Header */}
+      <div
+        className={cn(
+          "flex items-center justify-between h-11 px-4 sm:px-6 border-b border-slate-300/80 bg-[#DFE6F0] sticky top-0 z-30 select-none rounded-t-md",
+          isDiscardModalOpen && "pointer-events-none"
+        )}
+      >
         <div className="flex items-center gap-1.5 sm:gap-2">
           <button
             type="button"
             data-testid="btn-header-back"
             onClick={handleAttemptCancel}
-            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-slate-600 border border-transparent transition-all select-none cursor-pointer shrink-0 hover:text-slate-900 hover:bg-white hover:border-slate-200/80 active:bg-slate-100/80 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy"
+            className="inline-flex items-center justify-center h-8 w-8 rounded-md text-telkom-navy border border-transparent transition-all select-none cursor-pointer shrink-0 hover:bg-white hover:border-slate-300/80 hover:text-telkom-navy active:bg-white active:border-slate-300/80 active:text-telkom-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy"
             title="Master Repository"
             aria-label="Back to Master Repository"
           >
-            <Database className="h-4 w-4 text-slate-600 hover:text-telkom-navy" />
+            <Database className="h-4 w-4 text-telkom-navy" />
           </button>
-          <span className="material-symbols-outlined text-[9.5px] text-slate-400 select-none leading-none">
+          <span className="material-symbols-outlined text-[9.5px] text-slate-500 select-none leading-none">
             arrow_forward_ios
           </span>
-          <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-white border border-slate-200/80 text-xs sm:text-sm font-semibold text-telkom-navy">
+          <div className="flex items-center gap-1.5 h-8 px-2.5 rounded-md bg-white border border-slate-300/80 text-xs sm:text-sm font-semibold text-telkom-navy shadow-none">
             {isEditMode ? (
               <>
                 <span className="material-symbols-outlined text-[16px] text-telkom-navy leading-none select-none">
@@ -576,7 +490,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         <div className="flex flex-wrap items-center justify-between gap-3 pt-6 border-t border-slate-200">
           {/* Mandatory fields alert banner when validation fails */}
           {hasSubmitAttempted && Object.keys(errors).length > 0 ? (
-            <div data-testid="form-validation-banner" className="flex items-center text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 px-3 py-2 rounded-lg animate-in fade-in duration-200 mr-auto">
+            <div data-testid="form-validation-banner" className="flex items-center text-xs font-semibold text-rose-600 bg-rose-50 border border-rose-200/80 px-3 py-2 rounded-md animate-in fade-in duration-200 mr-auto">
               <span>Kolom bertanda (*) wajib diisi</span>
             </div>
           ) : (
@@ -590,7 +504,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
               variant="outline"
               onClick={handleAttemptCancel}
               disabled={isSubmitting}
-              className="h-10 px-5 rounded-lg border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer font-medium text-sm transition-all"
+              className="h-10 px-5 rounded-md border-slate-200 text-slate-700 hover:bg-slate-100 cursor-pointer font-medium text-sm transition-all"
             >
               Cancel
             </Button>
@@ -599,7 +513,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
               type="submit"
               data-testid="btn-save-project"
               disabled={isSubmitting || (isEditMode && !isDirty)}
-              className="h-10 px-6 rounded-lg bg-telkom-navy hover:bg-[#003d82] active:bg-[#002047] text-white shadow-xs cursor-pointer font-semibold text-sm transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
+              className="h-10 px-6 rounded-md bg-telkom-navy hover:bg-[#003d82] active:bg-[#002047] text-white shadow-xs cursor-pointer font-semibold text-sm transition-all flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed disabled:pointer-events-none"
             >
               {isSubmitting ? (
                 <>

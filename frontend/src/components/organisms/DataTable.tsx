@@ -4,7 +4,6 @@ import {
   type ColumnFiltersState,
   type SortingState,
   type VisibilityState,
-  type Row,
   flexRender,
   getCoreRowModel,
   getFilteredRowModel,
@@ -12,7 +11,6 @@ import {
   useReactTable,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { RotateCcw } from "lucide-react";
 
 import {
   TableBody,
@@ -27,12 +25,16 @@ import { DataTableFilter } from "@/components/molecules/DataTableFilter";
 import { DataTableViewOptions } from "@/components/molecules/DataTableViewOptions";
 import { DataTableSearchInput } from "@/components/molecules/DataTableSearchInput";
 import { DataTableExport } from "@/components/molecules/DataTableExport";
+import { DataTableActiveFilters } from "@/components/molecules/DataTableActiveFilters";
+import { VirtualTableRow } from "@/components/organisms/VirtualTableRow";
+import { normalizeOrdersData, flattenOrderSidPairs } from "@/lib/orderParser";
 import {
   CellOverflowPopover,
   type CellOverflowData,
 } from "@/components/molecules/CellOverflowPopover";
 import { cn } from "@/lib/utils";
 import {
+  LOCKED_COLUMNS,
   MANDATORY_COLUMN_IDS,
   OVERFLOW_ENABLED_COLUMN_IDS,
   FILTER_CATEGORIES,
@@ -40,47 +42,9 @@ import {
   STORAGE_KEY_ORDER,
   STORAGE_KEY_FILTERS,
   STORAGE_KEY_SORTING,
-  idrCurrencyFormatter,
-} from "./columns";
-
-const LOCKED_COLUMNS = ["actions", "nomor"];
-
-export const customGlobalFilterFn = (
-  row: any,
-  columnId: string,
-  filterValue: any
-): boolean => {
-  if (!filterValue) return true;
-
-  const query =
-    typeof filterValue === "string"
-      ? filterValue.toLowerCase().trim()
-      : filterValue.query;
-  const targetCol =
-    typeof filterValue === "string" ? "all" : filterValue.targetColumn;
-
-  if (!query) return true;
-
-  // If a specific target column is selected, only evaluate that column
-  if (targetCol && targetCol !== "all" && columnId !== targetCol) {
-    return false;
-  }
-
-  const rawVal = row.getValue(columnId);
-  if (rawVal == null) return false;
-
-  // Standard case-insensitive string matching
-  const strVal = String(rawVal).toLowerCase();
-  if (strVal.includes(query)) return true;
-
-  // Special case: Rupiah formatted currency for nilai_kontrak_obl using singleton formatter
-  if (columnId === "nilai_kontrak_obl" && typeof rawVal === "number") {
-    const formatted = idrCurrencyFormatter.format(rawVal).toLowerCase();
-    if (formatted.includes(query)) return true;
-  }
-
-  return false;
-};
+  customGlobalFilterFn,
+} from "@/lib/table-constants";
+import type { ProjectPM } from "@/types/project";
 
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
@@ -89,101 +53,20 @@ interface DataTableProps<TData, TValue> {
   isLoading?: boolean;
   isCreateMode?: boolean;
   isFormMode?: boolean;
+  isTrashMode?: boolean;
   createFormSlot?: React.ReactNode;
   highlightedRowId?: string | null;
+  highlightVariant?: "sky" | "grey";
   onEdit?: (row: TData) => void;
   onDelete?: (row: TData) => void;
+  onRestore?: (row: TData) => void;
+  onPermanentDelete?: (row: TData) => void;
   onTrashClick?: () => void;
   onExportExcel?: () => void;
   onExportPdf?: () => void;
 }
 
-interface VirtualTableRowProps<TData> {
-  row: Row<TData>;
-  virtualRowIndex: number;
-  isRowHighlighted: boolean;
-  lastPinnedId: string | undefined;
-  isScrolledX: boolean;
-  columnsSignature: string;
-  onCellDoubleClick?: (e: React.MouseEvent<HTMLTableCellElement>, columnId: string, value: any) => void;
-}
-
-const VirtualTableRow = React.memo(
-  function VirtualTableRow<TData>({
-    row,
-    virtualRowIndex,
-    isRowHighlighted,
-    lastPinnedId,
-    isScrolledX,
-    onCellDoubleClick,
-  }: VirtualTableRowProps<TData>) {
-    return (
-      <TableRow
-        data-testid="table-row"
-        data-index={virtualRowIndex}
-        data-state={row.getIsSelected() && "selected"}
-        className={cn(
-          "group h-11",
-          isRowHighlighted && "bg-sky-50/90 font-medium transition-colors duration-700"
-        )}
-      >
-        {row.getVisibleCells().map((cell) => {
-          const isPinned = LOCKED_COLUMNS.includes(cell.column.id);
-          const isLastPinned = cell.column.id === lastPinnedId;
-          const isOverflowEligible = (OVERFLOW_ENABLED_COLUMN_IDS as readonly string[]).includes(cell.column.id);
-
-          return (
-            <TableCell
-              key={cell.id}
-              data-testid={`table-cell-${cell.column.id}`}
-              onDoubleClick={(e) => {
-                if (isOverflowEligible && onCellDoubleClick) {
-                  onCellDoubleClick(e, cell.column.id, cell.getValue());
-                }
-              }}
-              className={cn(
-                "py-1.5 px-3 text-ellipsis whitespace-nowrap border-b border-slate-100",
-                isLastPinned ? "overflow-visible" : "overflow-hidden",
-                isOverflowEligible && "cursor-default",
-                isRowHighlighted
-                  ? isPinned
-                    ? "sticky z-10 bg-sky-50 text-sky-950 font-semibold transition-colors duration-700"
-                    : "bg-sky-50/90 text-sky-950 font-medium transition-colors duration-700"
-                  : isPinned
-                  ? "sticky z-10 bg-white text-slate-700 group-hover:bg-slate-50"
-                  : "bg-white text-slate-700 group-hover:bg-slate-50",
-                isLastPinned &&
-                  "after:content-[''] after:absolute after:top-0 after:bottom-0 after:right-0 after:w-2.5 after:translate-x-full after:pointer-events-none after:transition-opacity after:duration-150 after:bg-gradient-to-r after:from-slate-900/[0.07] after:to-transparent",
-                isLastPinned && (isScrolledX ? "after:opacity-100" : "after:opacity-0")
-              )}
-              style={{
-                width: cell.column.getSize(),
-                left: isPinned ? `${cell.column.getStart()}px` : undefined,
-              }}
-            >
-              {cell.column.id === "nomor" ? (
-                <div className="text-center font-medium">{virtualRowIndex + 1}</div>
-              ) : (
-                flexRender(cell.column.columnDef.cell, cell.getContext())
-              )}
-            </TableCell>
-          );
-        })}
-      </TableRow>
-    );
-  },
-  (prev, next) => {
-    return (
-      prev.row.original === next.row.original &&
-      prev.virtualRowIndex === next.virtualRowIndex &&
-      prev.isRowHighlighted === next.isRowHighlighted &&
-      prev.lastPinnedId === next.lastPinnedId &&
-      prev.isScrolledX === next.isScrolledX &&
-      prev.columnsSignature === next.columnsSignature &&
-      prev.onCellDoubleClick === next.onCellDoubleClick
-    );
-  }
-) as <TData>(props: VirtualTableRowProps<TData>) => React.ReactElement;
+const EMPTY_SORTING: SortingState = [];
 
 export function DataTable<TData, TValue>({
   columns,
@@ -192,10 +75,14 @@ export function DataTable<TData, TValue>({
   isLoading = false,
   isCreateMode = false,
   isFormMode,
+  isTrashMode = false,
   createFormSlot,
   highlightedRowId = null,
+  highlightVariant = "sky",
   onEdit,
   onDelete,
+  onRestore,
+  onPermanentDelete,
   onTrashClick,
   onExportExcel,
   onExportPdf,
@@ -222,7 +109,12 @@ export function DataTable<TData, TValue>({
     }
     return defaultSort;
   });
-  const [globalFilter, setGlobalFilter] = React.useState<any>(undefined);
+  const [globalFilter, setGlobalFilter] = React.useState<unknown>(undefined);
+  const [expandedRows, setExpandedRows] = React.useState<Record<string, boolean>>({});
+
+  const toggleRowExpand = React.useCallback((rowId: string) => {
+    setExpandedRows((prev) => ({ ...prev, [rowId]: !prev[rowId] }));
+  }, []);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(() => {
     if (typeof window === "undefined") return [];
     try {
@@ -267,19 +159,22 @@ export function DataTable<TData, TValue>({
   });
 
   const [columnOrder, setColumnOrder] = React.useState<string[]>(() => {
-    const allIds = columns.map((col) => (col.id || (col as any).accessorKey) as string);
+    const allIds = columns.map((col) => {
+      const c = col as { id?: string; accessorKey?: string };
+      return (c.id || c.accessorKey || "") as string;
+    }).filter(Boolean);
     if (typeof window === "undefined") return allIds;
     try {
       const saved = localStorage.getItem(STORAGE_KEY_ORDER);
       if (saved) {
         const parsed = JSON.parse(saved) as string[];
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const mandatory = Array.from(MANDATORY_COLUMN_IDS);
+          const mandatory = Array.from(MANDATORY_COLUMN_IDS) as string[];
           const validSaved = parsed.filter(
-            (id) => !mandatory.includes(id as any) && allIds.includes(id)
+            (id) => !mandatory.includes(id) && allIds.includes(id)
           );
           const missing = allIds.filter(
-            (id) => !mandatory.includes(id as any) && !validSaved.includes(id)
+            (id) => !mandatory.includes(id) && !validSaved.includes(id)
           );
           return [...mandatory, ...validSaved, ...missing];
         }
@@ -290,13 +185,35 @@ export function DataTable<TData, TValue>({
     return allIds;
   });
 
+  const meta = React.useMemo(
+    () => ({
+      isTrashView: isTrashMode,
+      onEdit: onEdit as ((row: unknown) => void) | undefined,
+      onDelete: onDelete as ((row: unknown) => void) | undefined,
+      onRestore: onRestore as ((row: unknown) => void) | undefined,
+      onPermanentDelete: onPermanentDelete as ((row: unknown) => void) | undefined,
+      expandedRows,
+      toggleRowExpand,
+    }),
+    [
+      isTrashMode,
+      onEdit,
+      onDelete,
+      onRestore,
+      onPermanentDelete,
+      expandedRows,
+      toggleRowExpand,
+    ]
+  );
+
   const table = useReactTable({
     data,
     columns,
-    meta: {
-      onEdit,
-      onDelete,
+    getRowId: (row: TData, index: number) => {
+      const r = row as { project_id_pm?: string | number };
+      return r?.project_id_pm ? String(r.project_id_pm) : String(index);
     },
+    meta,
     globalFilterFn: customGlobalFilterFn,
     getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
@@ -342,8 +259,8 @@ export function DataTable<TData, TValue>({
     onColumnOrderChange: (updater) => {
       setColumnOrder((prev) => {
         const next = typeof updater === "function" ? updater(prev) : updater;
-        const mandatory = Array.from(MANDATORY_COLUMN_IDS);
-        const nonMandatory = next.filter((id) => !mandatory.includes(id as any));
+        const mandatory = Array.from(MANDATORY_COLUMN_IDS) as string[];
+        const nonMandatory = next.filter((id) => !mandatory.includes(id));
         const sanitized = [...mandatory, ...nonMandatory];
         try {
           localStorage.setItem(STORAGE_KEY_ORDER, JSON.stringify(sanitized));
@@ -378,7 +295,7 @@ export function DataTable<TData, TValue>({
     },
     columnResizeMode: "onChange",
     state: {
-      sorting,
+      sorting: isTrashMode ? EMPTY_SORTING : sorting,
       globalFilter,
       columnVisibility,
       columnOrder,
@@ -388,13 +305,14 @@ export function DataTable<TData, TValue>({
 
   const { rows } = table.getRowModel();
   const parentRef = React.useRef<HTMLDivElement>(null);
+  const lastScrollPosRef = React.useRef<{ top: number; left: number }>({ top: 0, left: 0 });
   const [isScrolledX, setIsScrolledX] = React.useState(false);
   const [activeOverflow, setActiveOverflow] = React.useState<CellOverflowData | null>(null);
 
   const prevScrollTopRef = React.useRef(0);
 
   const handleCellDoubleClick = React.useCallback(
-    (e: React.MouseEvent<HTMLTableCellElement>, columnId: string, value: any) => {
+    (e: React.MouseEvent<HTMLTableCellElement>, columnId: string, value: unknown) => {
       if (!(OVERFLOW_ENABLED_COLUMN_IDS as readonly string[]).includes(columnId)) return;
       const textVal = value != null ? String(value).trim() : "";
       if (!textVal || textVal === "-") return;
@@ -430,6 +348,7 @@ export function DataTable<TData, TValue>({
     let rAFId: number | null = null;
     const handleScroll = () => {
       const currentScrollTop = el.scrollTop;
+      lastScrollPosRef.current = { top: el.scrollTop, left: el.scrollLeft };
 
       // Vertical scroll strictly dismisses the overflow popover
       if (Math.abs(currentScrollTop - prevScrollTopRef.current) > 1) {
@@ -467,46 +386,124 @@ export function DataTable<TData, TValue>({
       .map((c) => c.id)
       .filter((id) => LOCKED_COLUMNS.includes(id));
     return visiblePinned[visiblePinned.length - 1];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [table, columnVisibility, columnOrder]);
 
   const rowVirtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 44,
-    overscan: 3,
+    estimateSize: (index) => {
+      const row = rows[index];
+      if (row && expandedRows[row.id]) {
+        const pairs = flattenOrderSidPairs(normalizeOrdersData(row.original as unknown as ProjectPM));
+        return Math.max(44, pairs.length * 44);
+      }
+      return 44;
+    },
+    overscan: 5,
   });
 
-  // Smoothly auto-scroll to highlighted newly-added or edited row
+  // Re-measure virtual rows whenever expandedRows state changes
   React.useEffect(() => {
-    if (!isFormActive && highlightedRowId && rows.length > 0) {
+    rowVirtualizer.measure();
+  }, [expandedRows, rowVirtualizer]);
+
+  // Scroll position preservation & auto-scroll to highlighted row
+  React.useEffect(() => {
+    if (isFormActive) return;
+
+    const el = parentRef.current;
+    if (!el) return;
+
+    const { top, left } = lastScrollPosRef.current;
+
+    if (highlightedRowId && rows.length > 0) {
       const targetIndex = rows.findIndex(
-        (r) => (r.original as any)?.project_id_pm === highlightedRowId
+        (r) => (r.original as unknown as ProjectPM)?.project_id_pm === highlightedRowId
       );
+
       if (targetIndex >= 0) {
+        if (highlightVariant === "grey") {
+          // Returning from Cancel in Edit mode: restore exact previous scroll coordinates
+          const timeoutId = setTimeout(() => {
+            if (parentRef.current) {
+              parentRef.current.scrollTop = top;
+              parentRef.current.scrollLeft = left;
+            }
+          }, 50);
+          return () => clearTimeout(timeoutId);
+        } else {
+          // Successfully saved/added new project: instant jump into view (zero latency)
+          const timeoutId = setTimeout(() => {
+            rowVirtualizer.scrollToIndex(targetIndex, {
+              align: "center",
+              behavior: "auto",
+            });
+            if (parentRef.current && left > 0) {
+              parentRef.current.scrollLeft = left;
+            }
+          }, 30);
+          return () => clearTimeout(timeoutId);
+        }
+      }
+    } else {
+      // Returning without highlight (e.g. Cancel/Back on Add Project): restore exact scroll coordinates
+      if (top > 0 || left > 0) {
         const timeoutId = setTimeout(() => {
-          rowVirtualizer.scrollToIndex(targetIndex, {
-            align: "auto",
-            behavior: "smooth",
-          });
-        }, 120);
+          if (parentRef.current) {
+            parentRef.current.scrollTop = top;
+            parentRef.current.scrollLeft = left;
+          }
+        }, 50);
         return () => clearTimeout(timeoutId);
       }
     }
-  }, [isFormActive, highlightedRowId, rows, rowVirtualizer]);
+  }, [isFormActive, highlightedRowId, highlightVariant, rows, rowVirtualizer]);
 
   const virtualRows = rowVirtualizer.getVirtualItems();
   const totalSize = rowVirtualizer.getTotalSize();
+
+  // Auto-collapse expanded rows when user scrolls far away and the row leaves the virtualized view
+  React.useEffect(() => {
+    const activeExpandedKeys = Object.keys(expandedRows).filter(
+      (key) => expandedRows[key]
+    );
+    if (activeExpandedKeys.length === 0) return;
+
+    const renderedRowIds = new Set(
+      virtualRows.map((vr) => rows[vr.index]?.id).filter(Boolean)
+    );
+
+    const hasScrolledOut = activeExpandedKeys.some(
+      (id) => !renderedRowIds.has(id)
+    );
+
+    if (hasScrolledOut) {
+      setExpandedRows((prev) => {
+        let changed = false;
+        const next = { ...prev };
+        for (const id of activeExpandedKeys) {
+          if (!renderedRowIds.has(id)) {
+            delete next[id];
+            changed = true;
+          }
+        }
+        return changed ? next : prev;
+      });
+    }
+  }, [virtualRows, rows, expandedRows]);
+
+  const columnOrderState = table.getState().columnOrder;
+  const columnVisibilityState = table.getState().columnVisibility;
+  const columnSizingState = table.getState().columnSizing;
 
   const columnsSignature = React.useMemo(() => {
     return table
       .getVisibleLeafColumns()
       .map((c) => `${c.id}:${c.getSize()}`)
       .join(",");
-  }, [
-    table.getState().columnOrder,
-    table.getState().columnVisibility,
-    table.getState().columnSizing,
-  ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [table, columnOrderState, columnVisibilityState, columnSizingState]);
 
   const paddingTop = virtualRows.length > 0 ? virtualRows[0].start : 0;
   const paddingBottom = virtualRows.length > 0
@@ -519,7 +516,7 @@ export function DataTable<TData, TValue>({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 md:gap-4 w-full">
         {/* Mobile Row 1: Action Slot (Add Project / Back) / Left Item on Desktop */}
         <div className="w-full md:w-auto md:flex md:items-center md:gap-3">
-          <div className="w-full md:w-auto [&>button]:w-full md:[&>button]:w-auto [&>button]:justify-center">
+          <div className="w-full md:w-auto [&>button]:w-full md:[&>button]:w-[136px] [&>button]:justify-center">
             {actionSlot}
           </div>
         </div>
@@ -535,7 +532,7 @@ export function DataTable<TData, TValue>({
           <div className="w-full">
             <DataTableExport
               className="w-full px-1 sm:px-2"
-              disabled={isFormActive}
+              disabled={isFormActive || isTrashMode}
               onExportExcel={onExportExcel}
               onExportPdf={onExportPdf}
             />
@@ -548,7 +545,8 @@ export function DataTable<TData, TValue>({
               disabled={isFormActive}
               onClick={onTrashClick}
               className={cn(
-                "group/trash h-10 w-full rounded-md flex items-center justify-center cursor-pointer px-1 sm:px-2 gap-1 shadow-sm transition-all text-xs border border-transparent bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
+                "group/trash h-10 w-full rounded-md flex items-center justify-center cursor-pointer px-1 sm:px-2 gap-1 transition-all text-xs border border-slate-300/80 bg-white hover:bg-slate-50 hover:border-telkom-red hover:text-telkom-red active:bg-slate-100",
+                isTrashMode && "!bg-red-50 !border-telkom-red !text-telkom-red shadow-2xs font-semibold",
                 isFormActive &&
                   "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 !text-slate-700 shadow-2xs"
               )}
@@ -558,7 +556,9 @@ export function DataTable<TData, TValue>({
                   "material-symbols-outlined text-[18px] transition-colors leading-none select-none",
                   isFormActive
                     ? "!text-slate-500"
-                    : "text-slate-500 group-hover/trash:text-telkom-navy"
+                    : isTrashMode
+                    ? "!text-telkom-red"
+                    : "text-slate-500 group-hover/trash:text-telkom-red"
                 )}
               >
                 restore_from_trash
@@ -568,7 +568,9 @@ export function DataTable<TData, TValue>({
                   "font-medium truncate transition-colors",
                   isFormActive
                     ? "!text-slate-700"
-                    : "text-slate-600 group-hover/trash:text-telkom-navy"
+                    : isTrashMode
+                    ? "!text-telkom-red font-semibold"
+                    : "text-slate-600 group-hover/trash:text-telkom-red"
                 )}
               >
                 Trash
@@ -588,7 +590,7 @@ export function DataTable<TData, TValue>({
             <DataTableFilter table={table} disabled={isFormActive} />
             <DataTableViewOptions table={table} disabled={isFormActive} />
             <DataTableExport
-              disabled={isFormActive}
+              disabled={isFormActive || isTrashMode}
               onExportExcel={onExportExcel}
               onExportPdf={onExportPdf}
             />
@@ -599,7 +601,8 @@ export function DataTable<TData, TValue>({
               disabled={isFormActive}
               onClick={onTrashClick}
               className={cn(
-                "group/trash h-10 rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-4 gap-1.5 sm:gap-2 shadow-sm transition-all text-xs sm:text-sm border border-transparent bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
+                "group/trash h-10 min-h-10 max-h-10 shrink-0 w-full md:w-[120px] rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-2.5 gap-1 sm:gap-1.5 transition-all text-xs sm:text-sm border border-slate-300/80 bg-white hover:bg-slate-50 hover:border-telkom-red hover:text-telkom-red active:bg-slate-100",
+                isTrashMode && "!bg-red-50 !border-telkom-red !text-telkom-red shadow-2xs font-semibold",
                 isFormActive &&
                   "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 !text-slate-700 shadow-2xs"
               )}
@@ -609,17 +612,21 @@ export function DataTable<TData, TValue>({
                   "material-symbols-outlined text-[18px] sm:text-[20px] transition-colors leading-none select-none",
                   isFormActive
                     ? "!text-slate-500"
-                    : "text-slate-500 group-hover/trash:text-telkom-navy"
+                    : isTrashMode
+                    ? "!text-telkom-red"
+                    : "text-slate-500 group-hover/trash:text-telkom-red"
                 )}
               >
                 restore_from_trash
               </span>
               <span
                 className={cn(
-                  "font-medium truncate transition-colors",
+                  "font-medium whitespace-nowrap transition-colors",
                   isFormActive
                     ? "!text-slate-700"
-                    : "text-slate-600 group-hover/trash:text-telkom-navy"
+                    : isTrashMode
+                    ? "!text-telkom-red font-semibold"
+                    : "text-slate-600 group-hover/trash:text-telkom-red"
                 )}
               >
                 Trash
@@ -630,65 +637,13 @@ export function DataTable<TData, TValue>({
       </div>
 
       {/* Active Filter Chips / Pills */}
-      {!isFormActive && columnFilters.length > 0 && (
-        <div className="flex items-start justify-end gap-2.5 -mt-2 pt-0.5 w-full">
-          {/* Left Column: Filter chips that wrap without intruding under Clear all */}
-          <div className="flex flex-wrap items-center justify-end gap-1.5 flex-1 min-w-0">
-            <span className="text-xs text-slate-400 font-medium mr-1 select-none shrink-0">
-              Active filters:
-            </span>
-            {columnFilters.map((filter) => {
-              const category = FILTER_CATEGORIES.find((c) => c.id === filter.id);
-              const label = category ? category.label : filter.id;
-              const values = Array.isArray(filter.value)
-                ? (filter.value as string[])
-                : [String(filter.value)];
-
-              return values.map((val) => (
-                <span
-                  key={`${filter.id}-${val}`}
-                  className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 text-slate-700 shadow-2xs transition-colors"
-                >
-                  <span className="text-slate-400 font-normal">{label}:</span>
-                  <span className="text-telkom-navy font-semibold">{val}</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const next = values.filter((v) => v !== val);
-                      table
-                        .getColumn(filter.id)
-                        ?.setFilterValue(next.length > 0 ? next : undefined);
-                    }}
-                    className="hover:text-red-600 text-slate-400 p-0.5 rounded cursor-pointer leading-none transition-colors"
-                    title={`Remove ${label}: ${val}`}
-                  >
-                    ✕
-                  </button>
-                </span>
-              ));
-            })}
-          </div>
-
-          {/* Right Column: Divider | and Clear all button locked at top-right */}
-          <div className="shrink-0 flex items-center gap-2.5 self-start">
-            <span className="text-slate-300 text-xs select-none leading-none">|</span>
-            <button
-              type="button"
-              data-testid="clear-all-filters"
-              onClick={() => table.resetColumnFilters()}
-              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold text-telkom-red border border-transparent bg-red-50/60 hover:border-telkom-red/40 transition-all cursor-pointer"
-              title="Clear all active filters"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Clear all
-            </button>
-          </div>
-        </div>
+      {!isFormActive && (
+        <DataTableActiveFilters table={table} columnFilters={columnFilters} />
       )}
 
       {/* Main Table or Form Content Frame */}
       <div 
-        className="rounded-lg bg-white shadow-sm flex-1 min-h-0 w-full relative overflow-hidden flex flex-col isolate"
+        className="rounded-lg bg-white border border-slate-300/80 shadow-sm flex-1 min-h-0 w-full relative overflow-hidden flex flex-col isolate"
       >
         {isFormActive && createFormSlot ? (
           createFormSlot
@@ -700,7 +655,7 @@ export function DataTable<TData, TValue>({
             style={{ willChange: "scroll-position" }}
           >
             <table className="w-full caption-bottom text-sm border-separate border-spacing-0" style={{ width: table.getTotalSize(), tableLayout: 'fixed' }}>
-          <TableHeader className="bg-slate-100 sticky top-0 z-30">
+          <TableHeader className="bg-[#DFE6F0] sticky top-0 z-30">
             {table.getHeaderGroups().map((headerGroup) => {
               const visiblePinnedIds = headerGroup.headers
                 .map((h) => h.column.id)
@@ -717,7 +672,7 @@ export function DataTable<TData, TValue>({
                       <TableHead 
                         key={header.id} 
                         className={cn(
-                          "text-telkom-navy font-semibold h-11 group/resizer text-ellipsis bg-slate-100 border-b border-slate-200",
+                          "text-telkom-navy font-semibold h-11 group/resizer text-ellipsis bg-[#DFE6F0] border-b border-slate-300/80",
                           isLastPinned ? "overflow-visible" : "overflow-hidden",
                           isPinned ? "sticky z-50" : "sticky top-0 z-30",
                           isLastPinned &&
@@ -813,7 +768,7 @@ export function DataTable<TData, TValue>({
                   if (!row) return null;
                   const isRowHighlighted =
                     Boolean(highlightedRowId) &&
-                    (row.original as any)?.project_id_pm === highlightedRowId;
+                    (row.original as unknown as ProjectPM)?.project_id_pm === highlightedRowId;
 
                   return (
                     <VirtualTableRow
@@ -821,9 +776,12 @@ export function DataTable<TData, TValue>({
                       row={row}
                       virtualRowIndex={virtualRow.index}
                       isRowHighlighted={isRowHighlighted}
+                      highlightVariant={highlightVariant}
+                      isExpanded={Boolean(expandedRows[row.id])}
                       lastPinnedId={lastPinnedId}
                       isScrolledX={isScrolledX}
                       columnsSignature={columnsSignature}
+                      measureElement={rowVirtualizer.measureElement}
                       onCellDoubleClick={handleCellDoubleClick}
                     />
                   );

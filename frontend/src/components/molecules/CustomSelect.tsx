@@ -76,8 +76,12 @@ export function CustomSelect({
   // Sync highlighted option index when opening dropdown
   React.useEffect(() => {
     if (isOpen) {
-      const idx = normalizedOptions.findIndex((opt) => opt.value === (value || ""));
-      setHighlightedIndex(idx >= 0 ? idx : 0);
+      if (value) {
+        const idx = normalizedOptions.findIndex((opt) => opt.value === value);
+        setHighlightedIndex(idx >= 0 ? idx : -1);
+      } else {
+        setHighlightedIndex(-1);
+      }
     } else {
       setHighlightedIndex(-1);
     }
@@ -168,7 +172,7 @@ export function CustomSelect({
         type="button"
         onKeyDown={handleKeyDown}
         className={cn(
-          "w-full h-10 px-3 rounded-lg border bg-white text-sm transition-all flex items-center justify-between text-left outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0 select-none cursor-pointer",
+          "w-full h-10 px-3 rounded-md border bg-white text-sm transition-all flex items-center justify-between text-left outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0 select-none cursor-pointer",
           error
             ? "border-red-400 focus:border-red-500"
             : isOpen
@@ -197,15 +201,15 @@ export function CustomSelect({
       <PopoverContent
         align="start"
         side="bottom"
-        sideOffset={4}
+        sideOffset={6}
         onKeyDown={handleKeyDown}
         style={{ width: menuWidth ? `${menuWidth}px` : "auto", minWidth: menuWidth ? `${menuWidth}px` : "180px" }}
-        className="p-1.5 rounded-xl border-none bg-white shadow-xl max-h-64 overflow-y-auto space-y-0.5 z-50 duration-75 hide-scrollbar"
+        className="p-1.5 rounded-md border-none bg-white shadow-xl max-h-64 overflow-y-auto space-y-0.5 z-50 duration-75 hide-scrollbar"
       >
         {normalizedOptions.map((opt, idx) => {
-          const isSelected = opt.value === (value || "");
+          // Clear option ("Pilih...") is not treated as a selected item with checkmark
+          const isSelected = Boolean(value) && opt.value === value;
           const isHighlighted = idx === highlightedIndex;
-          const isClearOpt = opt.value === "";
 
           return (
             <button
@@ -218,26 +222,15 @@ export function CustomSelect({
               onClick={() => handleSelect(opt.value)}
               onMouseEnter={() => setHighlightedIndex(idx)}
               className={cn(
-                "w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left transition-colors cursor-pointer select-none border-0 border-none outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0",
+                "w-full flex items-center justify-between px-3 py-2 rounded-md text-sm text-left transition-colors cursor-pointer select-none border-0 border-none outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0",
                 isSelected
                   ? "bg-telkom-navy/10 text-telkom-navy font-semibold"
                   : isHighlighted
                   ? "bg-slate-100 text-slate-900 font-medium"
-                  : isClearOpt
-                  ? "text-slate-400 hover:bg-slate-100 hover:text-slate-900 font-normal"
                   : "text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium"
               )}
             >
-              <span
-                className={cn(
-                  "truncate mr-2",
-                  isClearOpt
-                    ? isHighlighted
-                      ? "text-slate-900 font-medium"
-                      : "text-slate-400 font-normal"
-                    : ""
-                )}
-              >
+              <span className="truncate mr-2 text-slate-700 font-medium">
                 {opt.label}
               </span>
               {isSelected && <Check className="h-4 w-4 text-telkom-navy shrink-0" />}

@@ -146,7 +146,7 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
           borderRadius: isDesktop ? 12 : 0,
         }}
         className={cn(
-          "bg-slate-200 shadow-[inset_0_1px_4px_rgba(0,0,0,0.03)] overflow-hidden z-20",
+          "bg-[#F6F7FB] border border-slate-300/80 shadow-[inset_0_1px_4px_rgba(0,0,0,0.03)] overflow-hidden z-20",
           !isDesktop && !isTransitioning && "pointer-events-none"
         )}
       >
@@ -161,8 +161,8 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
 
           {/* Staged Gradient Canvas:
               - 0% to 33.3%: Resting state (transparent top, soft white bottom)
-              - 33.3% to 66.6%: Phase 1 (50% white top, seamless gradient blend, 50% light-blue bottom)
-              - 66.6% to 100%: Phase 2 (100% solid light-blue #e2e8f0 taking over completely)
+              - 33.3% to 66.6%: Phase 1 (50% white top, seamless gradient blend, 50% bottom matching global layout bg #F6F7FB)
+              - 66.6% to 100%: Phase 2 (100% solid global layout bg #F6F7FB taking over completely)
           */}
           <motion.div
             initial={false}
@@ -183,7 +183,7 @@ export function AuthSplitLayout({ children, isTransitioning }: AuthSplitLayoutPr
             style={{
               height: "300%",
               background:
-                "linear-gradient(to bottom, transparent 0%, transparent 12%, rgba(255, 255, 255, 0.85) 24%, #ffffff 33.33%, #ffffff 38%, #e2e8f0 60%, #e2e8f0 100%)",
+                "linear-gradient(to bottom, transparent 0%, transparent 12%, rgba(255, 255, 255, 0.85) 24%, #ffffff 33.33%, #ffffff 38%, #F6F7FB 60%, #F6F7FB 100%)",
             }}
             className="absolute inset-x-0 top-0 pointer-events-none z-10"
           />

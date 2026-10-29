@@ -49,7 +49,7 @@ export const CurrencyInput = React.forwardRef<HTMLInputElement, CurrencyInputPro
     return (
       <div
         className={cn(
-          "relative flex items-center w-full rounded-lg border border-slate-400 hover:border-slate-500 bg-white transition-all focus-within:border-telkom-navy focus-within:ring-0",
+          "relative flex items-center w-full rounded-md border border-slate-400 hover:border-slate-500 bg-white transition-all focus-within:border-telkom-navy focus-within:ring-0",
           disabled && "bg-slate-50 opacity-60 cursor-not-allowed",
           className
         )}

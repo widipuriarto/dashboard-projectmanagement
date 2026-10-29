@@ -47,7 +47,7 @@ export default function NavItem({ label, href, icon: Icon, isCollapsed }: NavIte
       className={cn(
         "relative flex items-center h-10 w-full rounded-lg text-sm transition-all duration-300 ease-in-out outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy focus-visible:ring-offset-2 overflow-hidden px-3 gap-3 select-none",
         isActive
-          ? "text-telkom-navy font-semibold bg-telkom-navy/5"
+          ? "text-telkom-navy font-semibold bg-[#EAEFF8]"
           : "text-slate-600 font-medium hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200/80"
       )}
     >

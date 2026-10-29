@@ -7,7 +7,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { getColumnDisplayTitle } from "@/components/organisms/columns";
+import { getColumnDisplayTitle } from "@/lib/table-constants";
 
 interface DataTableSearchInputProps<TData> {
   table: Table<TData>;
@@ -42,6 +42,8 @@ export function DataTableSearchInput<TData>({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const isTrashView = Boolean((table.options.meta as any)?.isTrashView);
+
   // Extract all searchable data columns (excluding actions and row number)
   const searchableColumns = React.useMemo(() => {
     return table
@@ -49,9 +51,9 @@ export function DataTableSearchInput<TData>({
       .filter((col) => col.id !== "actions" && col.id !== "nomor")
       .map((col) => ({
         id: col.id,
-        label: getColumnDisplayTitle(col.id),
+        label: getColumnDisplayTitle(col.id, isTrashView),
       }));
-  }, [table]);
+  }, [table, isTrashView]);
 
   // Filter columns list by user input inside the dropdown
   const filteredColumns = React.useMemo(() => {
@@ -67,8 +69,8 @@ export function DataTableSearchInput<TData>({
   const activeColumnLabel = React.useMemo(() => {
     if (targetColumn === "all") return "All Columns";
     const found = searchableColumns.find((c) => c.id === targetColumn);
-    return found ? found.label : getColumnDisplayTitle(targetColumn);
-  }, [targetColumn, searchableColumns]);
+    return found ? found.label : getColumnDisplayTitle(targetColumn, isTrashView);
+  }, [targetColumn, searchableColumns, isTrashView]);
 
   // Dynamic input placeholder based on selected column
   const placeholderText = React.useMemo(() => {
@@ -102,15 +104,26 @@ export function DataTableSearchInput<TData>({
   return (
     <div
       className={cn(
-        "relative flex items-center h-10 w-full md:w-[420px] bg-white border border-transparent rounded-md shadow-sm transition-all",
+        "relative flex items-center h-10 min-h-10 max-h-10 shrink-0 box-border w-full md:w-[420px] bg-white border rounded-md transition-all",
         disabled
-          ? "opacity-80 pointer-events-none cursor-not-allowed bg-slate-100/70 border-slate-300 shadow-2xs"
-          : "hover:border-telkom-navy focus-within:border-telkom-navy focus-within:ring-1 focus-within:ring-telkom-navy",
+          ? "opacity-80 pointer-events-none cursor-not-allowed bg-slate-100/70 border-slate-300"
+          : isDropdownOpen
+          ? "border-telkom-navy ring-1 ring-telkom-navy"
+          : "border-slate-300/80 hover:border-telkom-navy focus-within:border-telkom-navy focus-within:ring-1 focus-within:ring-telkom-navy",
         className
       )}
     >
       {/* Search Icon */}
-      <Search className={cn("h-4 w-4 ml-3 shrink-0 pointer-events-none select-none", disabled ? "text-slate-500" : "text-slate-400 group-hover:text-telkom-navy")} />
+      <Search
+        className={cn(
+          "h-4 w-4 ml-3 shrink-0 pointer-events-none select-none transition-colors",
+          disabled
+            ? "text-slate-500"
+            : isDropdownOpen
+            ? "text-telkom-navy"
+            : "text-slate-500 group-hover:text-telkom-navy"
+        )}
+      />
 
       {/* Column Selector Popover Trigger */}
       <Popover open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
@@ -132,24 +145,25 @@ export function DataTableSearchInput<TData>({
 
         <PopoverContent
           align="start"
-          sideOffset={8}
-          className="w-64 p-2 rounded-2xl shadow-xl border-none bg-white"
+          sideOffset={12}
+          className="w-64 p-2 rounded-md shadow-md border border-telkom-navy bg-white"
         >
           {/* Quick Filter Input inside Dropdown */}
           <div className="relative mb-1.5">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none select-none" />
             <input
+              autoFocus
               type="text"
               placeholder="Search column..."
               value={columnSearchQuery}
               onChange={(e) => setColumnSearchQuery(e.target.value)}
-              className="w-full h-8 pl-8 pr-7 text-xs bg-slate-50/60 border border-slate-200/60 rounded-lg text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-telkom-navy/60 focus:ring-1 focus:ring-telkom-navy/20 transition-all"
+              className="w-full h-8 pl-8 pr-7 text-xs bg-white border border-telkom-navy rounded-md text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-telkom-navy transition-all"
             />
             {columnSearchQuery && (
               <button
                 type="button"
                 onClick={() => setColumnSearchQuery("")}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-0.5 leading-none"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-0.5 leading-none rounded-md"
               >
                 ✕
               </button>
@@ -164,7 +178,7 @@ export function DataTableSearchInput<TData>({
               data-testid="search-column-all"
               onClick={() => handleSelectColumn("all")}
               className={cn(
-                "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer",
+                "w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors text-left cursor-pointer",
                 targetColumn === "all"
                   ? "bg-telkom-navy text-white font-semibold shadow-xs"
                   : "text-slate-700 hover:bg-slate-100 font-medium"
@@ -188,7 +202,7 @@ export function DataTableSearchInput<TData>({
                   type="button"
                   onClick={() => handleSelectColumn(col.id)}
                   className={cn(
-                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors text-left cursor-pointer",
+                    "w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs transition-colors text-left cursor-pointer",
                     isSelected
                       ? "bg-telkom-navy text-white font-semibold shadow-xs"
                       : "text-slate-700 hover:bg-slate-100 font-medium"
@@ -226,7 +240,7 @@ export function DataTableSearchInput<TData>({
         onBlur={() => setIsFocused(false)}
         placeholder={placeholderText}
         className={cn(
-          "flex-1 h-full min-w-0 bg-transparent px-2 text-sm outline-none border-0 focus:ring-0 focus:outline-none",
+          "flex-1 h-8 min-w-0 bg-transparent px-2 text-sm outline-none border-0 focus:ring-0 focus:outline-none",
           disabled ? "text-slate-600 placeholder:text-slate-500 cursor-not-allowed" : "text-slate-800 placeholder:text-slate-400"
         )}
       />

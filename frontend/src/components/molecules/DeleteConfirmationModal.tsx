@@ -1,12 +1,13 @@
 import * as React from "react";
 import { Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ProjectPM } from "@/components/organisms/columns";
+import type { ProjectPM } from "@/types/project";
 
 interface DeleteConfirmationModalProps {
   isOpen: boolean;
   project: ProjectPM | null;
   isDeleting?: boolean;
+  isPermanent?: boolean;
   onCancel: () => void;
   onConfirm: () => void;
 }
@@ -15,6 +16,7 @@ export function DeleteConfirmationModal({
   isOpen,
   project,
   isDeleting = false,
+  isPermanent = false,
   onCancel,
   onConfirm,
 }: DeleteConfirmationModalProps) {
@@ -47,7 +49,7 @@ export function DeleteConfirmationModal({
     >
       <div
         data-testid="delete-confirmation-modal"
-        className="relative rounded-2xl border-none bg-white p-6 shadow-2xl max-w-md w-full space-y-5 animate-in zoom-in-95 duration-200 select-none"
+        className="relative rounded-md border-none bg-white p-6 shadow-2xl max-w-md w-full space-y-5 animate-in zoom-in-95 duration-200 select-none"
       >
         {/* Warning Icon Badge */}
         <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-rose-50 text-rose-600 shadow-2xs">
@@ -60,21 +62,21 @@ export function DeleteConfirmationModal({
             id="delete-modal-title"
             className="text-lg font-bold text-slate-800 tracking-tight"
           >
-            Delete Project?
+            {isPermanent ? "Delete Project Permanently?" : "Delete Project?"}
           </h3>
           <p className="text-sm text-slate-600 leading-relaxed px-2">
             Are you sure you want to delete{" "}
             <span className="font-bold font-mono text-telkom-navy break-all">
               {project.project_id_pm}
             </span>
-            ? This action cannot be undone and will permanently remove this record from the repository.
+            ?{isPermanent ? " This action cannot be undone and will permanently remove this record from the repository." : ""}
           </p>
         </div>
 
         {/* Project Name Framed Container */}
-        <div className="rounded-xl bg-slate-50/80 p-3.5 text-center shadow-2xs">
+        <div className="rounded-md bg-slate-50/80 p-3.5 text-center shadow-2xs">
           <span className="block text-[11px] font-semibold text-slate-400 uppercase tracking-wider mb-1 select-none">
-            Nama Proyek
+            Nama Project
           </span>
           <p className="text-xs sm:text-sm font-semibold text-slate-800 leading-snug line-clamp-3 break-words">
             {project.nama_proyek || "-"}
@@ -89,7 +91,7 @@ export function DeleteConfirmationModal({
             variant="outline"
             onClick={onCancel}
             disabled={isDeleting}
-            className="w-full h-10 rounded-lg text-sm font-medium border border-transparent hover:border-telkom-navy hover:bg-slate-100 text-slate-700 cursor-pointer"
+            className="w-full h-10 rounded-md text-sm font-medium border border-transparent bg-slate-100 hover:bg-slate-200 text-slate-700 cursor-pointer"
           >
             Cancel
           </Button>
@@ -99,7 +101,7 @@ export function DeleteConfirmationModal({
             data-testid="delete-modal-confirm"
             onClick={onConfirm}
             disabled={isDeleting}
-            className="w-full h-10 rounded-lg text-sm font-semibold bg-telkom-red hover:bg-red-700 active:bg-red-800 text-white shadow-xs cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
+            className="w-full h-10 rounded-md text-sm font-semibold bg-telkom-red hover:bg-red-700 active:bg-red-800 text-white shadow-xs cursor-pointer flex items-center justify-center gap-2 disabled:opacity-50"
           >
             {isDeleting ? (
               <>
@@ -109,7 +111,7 @@ export function DeleteConfirmationModal({
             ) : (
               <>
                 <Trash2 className="h-4 w-4" />
-                <span>Delete</span>
+                <span>{isPermanent ? "Delete Permanently" : "Delete"}</span>
               </>
             )}
           </Button>

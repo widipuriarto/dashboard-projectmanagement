@@ -34,8 +34,8 @@ export default function ProfileDropdown({
   return (
     <div className="flex items-center gap-3">
       <DropdownMenu>
-        <DropdownMenuTrigger className="outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy focus-visible:ring-offset-2 rounded-lg cursor-pointer select-none">
-          <div className="h-9 w-9 rounded-lg bg-telkom-navy text-white text-xs font-semibold flex items-center justify-center border border-slate-200/80 shadow-xs shrink-0">
+        <DropdownMenuTrigger className="outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy focus-visible:ring-offset-2 rounded-md cursor-pointer select-none">
+          <div className="h-9 w-9 rounded-md bg-telkom-navy text-white text-xs font-semibold flex items-center justify-center border border-slate-300/80 shadow-none shrink-0">
             PM
           </div>
         </DropdownMenuTrigger>

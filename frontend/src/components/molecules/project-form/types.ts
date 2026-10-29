@@ -1,4 +1,6 @@
-import type { ProjectPM } from "@/components/organisms/columns";
+import type { ProjectPM } from "@/types/project";
+import type { OrdersData } from "@/types/orders";
+import { normalizeOrdersData } from "@/lib/orderParser";
 
 export interface ProjectFormData {
   project_id_pm: string;
@@ -20,6 +22,7 @@ export interface ProjectFormData {
   note_email_handover: string;
   no_order: string;
   sid: string;
+  orders_data?: OrdersData;
   jenis_layanan: string;
   status_delivery_project: string;
   jenis_dok_delivery: string;
@@ -60,6 +63,7 @@ export const INITIAL_FORM_DATA: ProjectFormData = {
   note_email_handover: "",
   no_order: "",
   sid: "",
+  orders_data: [{ order_id: "", sids: [{ sid: "" }] }],
   jenis_layanan: "",
   status_delivery_project: "",
   jenis_dok_delivery: "",
@@ -93,7 +97,7 @@ export function mapInitialFormData(data?: ProjectPM | null): ProjectFormData {
       ? "OK"
       : data.status_email_handover === false
       ? "NOK"
-      : data.status_email_handover || "";
+      : String(data.status_email_handover || "");
 
   return {
     project_id_pm: data.project_id_pm || "",
@@ -115,6 +119,14 @@ export function mapInitialFormData(data?: ProjectPM | null): ProjectFormData {
     note_email_handover: data.note_email_handover || "",
     no_order: data.no_order || "",
     sid: data.sid || "",
+    orders_data: (() => {
+      const normalized = normalizeOrdersData({
+        orders_data: data.orders_data,
+        no_order: data.no_order,
+        sid: data.sid,
+      });
+      return normalized.length > 0 ? normalized : [{ order_id: "", sids: [{ sid: "" }] }];
+    })(),
     jenis_layanan: data.jenis_layanan || "",
     status_delivery_project: data.status_delivery_project || "",
     jenis_dok_delivery: data.jenis_dok_delivery || "",
@@ -123,7 +135,9 @@ export function mapInitialFormData(data?: ProjectPM | null): ProjectFormData {
     no_bast_telkom: data.no_bast_telkom || "",
     tanggal_request_dr: sanitizeDate(data.tanggal_request_dr),
     tanggal_close_dr: sanitizeDate(data.tanggal_close_dr),
-    hardfile_bast: data.hardfile_bast || "",
+    hardfile_bast: typeof data.hardfile_bast === "boolean"
+      ? (data.hardfile_bast ? "Ada" : "Belum Ada")
+      : String(data.hardfile_bast || ""),
     tanggal_bast: sanitizeDate(data.tanggal_bast),
     tahun_bast: data.tahun_bast != null ? Number(data.tahun_bast) : null,
     status_order: data.status_order || "",

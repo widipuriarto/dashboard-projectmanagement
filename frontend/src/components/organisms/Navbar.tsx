@@ -9,7 +9,7 @@ export default function Navbar() {
       <div className="flex items-center gap-2 sm:gap-4">
         <button 
           type="button"
-          className="relative flex items-center justify-center h-9 w-9 rounded-lg bg-slate-50 border border-slate-200/80 text-slate-600 transition-all hover:bg-slate-200/70 hover:border-slate-300 hover:text-slate-950 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy cursor-pointer"
+          className="relative flex items-center justify-center h-9 w-9 rounded-md bg-[#F6F7FB] border border-slate-300/80 text-slate-600 transition-all hover:bg-slate-100 hover:border-slate-400/80 hover:text-slate-950 active:bg-slate-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-telkom-navy cursor-pointer"
           aria-label="Notifications"
         >
           <span className="material-symbols-outlined text-[20px] select-none leading-none">

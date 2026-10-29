@@ -95,7 +95,7 @@ export default function Breadcrumbs() {
                   <span
                     className={cn(
                       pillBaseClasses,
-                      "text-slate-900 bg-slate-50 border border-slate-200/80"
+                      "text-slate-900 bg-[#F6F7FB] border border-slate-300/80"
                     )}
                     aria-current="page"
                   >

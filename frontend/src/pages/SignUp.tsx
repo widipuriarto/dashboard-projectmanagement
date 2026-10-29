@@ -23,7 +23,7 @@ export default function SignUp() {
     setIsSubmitting(true);
     setIsTransitioning(true);
 
-    // Transition card to match exactly the main container of the dashboard (Phase 1 50/50 blend + Phase 2 blue expansion)
+    // Transition card to match exactly the main container of the dashboard (Phase 1 50/50 blend + Phase 2 expansion to global layout bg #F6F7FB)
     setTimeout(() => {
       navigate("/");
     }, 1400);

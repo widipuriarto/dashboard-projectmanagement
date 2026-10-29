@@ -10,11 +10,11 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import {
   FILTER_CATEGORIES,
-  type FilterCategory,
   getSlaCategory,
-  formatMonthYearKey,
   STORAGE_KEY_FILTERS,
-} from "@/components/organisms/columns";
+} from "@/lib/table-constants";
+import { formatMonthYearKey } from "@/lib/formatters";
+import type { FilterCategory } from "@/types/project";
 
 import { Checkbox } from "@/components/atoms/Checkbox";
 import { parseMonthYearSortKey } from "@/lib/date-constants";
@@ -212,12 +212,12 @@ export function DataTableFilter<TData>({
         disabled={disabled}
         className={cn(
           buttonVariants({ variant: "outline", size: "lg" }),
-          "group/filter h-10 rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-4 gap-1.5 sm:gap-2 shadow-sm transition-all text-xs sm:text-sm",
+          "group/filter h-10 min-h-10 max-h-10 shrink-0 w-full md:w-[120px] rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-2.5 gap-1 sm:gap-1.5 transition-all text-xs sm:text-sm",
           disabled
-            ? "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 !text-slate-700 shadow-2xs"
+            ? "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 shadow-2xs"
             : isOpen || activeCategoriesCount > 0
-            ? "border-telkom-navy bg-slate-50 text-telkom-navy shadow-inner"
-            : "border-transparent bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
+            ? "border-telkom-navy bg-slate-50 text-telkom-navy"
+            : "border-slate-300/80 bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
           className
         )}
       >
@@ -235,7 +235,7 @@ export function DataTableFilter<TData>({
         </span>
         <span
           className={cn(
-            "font-medium truncate transition-colors",
+            "font-medium whitespace-nowrap transition-colors",
             disabled
               ? "!text-slate-700"
               : isOpen || activeCategoriesCount > 0
@@ -255,7 +255,7 @@ export function DataTableFilter<TData>({
 
       <PopoverContent
         align="end"
-        className="w-[calc(100vw-32px)] sm:w-[460px] max-w-[460px] p-0 shadow-xl border-none rounded-2xl overflow-hidden"
+        className="w-[calc(100vw-32px)] sm:w-[460px] max-w-[460px] p-0 shadow-md border border-telkom-navy rounded-md overflow-hidden bg-white"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-slate-100 bg-white">
@@ -275,7 +275,7 @@ export function DataTableFilter<TData>({
               type="button"
               data-testid="filter-reset-all"
               onClick={handleResetAllFilters}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold text-telkom-red border border-transparent bg-red-50/60 hover:border-telkom-red/40 transition-all cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-white border border-telkom-red/80 text-telkom-red hover:bg-telkom-red hover:text-white hover:border-telkom-red active:bg-red-700 transition-all cursor-pointer shadow-none"
               title="Reset all filters"
             >
               <RotateCcw className="h-3 w-3" />
@@ -302,15 +302,22 @@ export function DataTableFilter<TData>({
                     setOptionSearchQuery("");
                   }}
                   className={cn(
-                    "w-full h-[34px] flex items-center justify-between px-2.5 rounded-lg text-xs transition-all text-left cursor-pointer border",
+                    "w-full h-[34px] flex items-center justify-between px-2.5 rounded-md text-xs transition-all text-left cursor-pointer border",
                     isSelected
-                      ? "bg-white text-telkom-navy font-semibold shadow-xs border-slate-200/80"
+                      ? "bg-telkom-navy text-white font-semibold shadow-none border-telkom-navy"
                       : "border-transparent text-slate-600 hover:bg-slate-200/50 font-medium"
                   )}
                 >
                   <span className="truncate">{category.label}</span>
                   {selectedCount > 0 && (
-                    <span className="ml-1.5 shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full bg-telkom-navy/10 text-telkom-navy text-[10px] font-bold">
+                    <span
+                      className={cn(
+                        "ml-1.5 shrink-0 inline-flex items-center justify-center h-4 min-w-4 px-1 rounded-full text-[10px] font-bold",
+                        isSelected
+                          ? "bg-white/20 text-white"
+                          : "bg-telkom-navy/10 text-telkom-navy"
+                      )}
+                    >
                       {selectedCount}
                     </span>
                   )}
@@ -337,13 +344,13 @@ export function DataTableFilter<TData>({
                 }
                 value={optionSearchQuery}
                 onChange={(e) => setOptionSearchQuery(e.target.value)}
-                className="w-full h-8 pl-8 pr-7 text-xs bg-slate-50/60 border border-slate-200/60 rounded-lg text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-telkom-navy/60 focus:ring-1 focus:ring-telkom-navy/20 transition-all"
+                className="w-full h-8 pl-8 pr-7 text-xs bg-slate-50/60 border border-slate-200/60 rounded-md text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-telkom-navy/60 focus:ring-1 focus:ring-telkom-navy/20 transition-all"
               />
               {optionSearchQuery && (
                 <button
                   type="button"
                   onClick={() => setOptionSearchQuery("")}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-0.5 leading-none"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-0.5 leading-none rounded-md"
                 >
                   ✕
                 </button>
@@ -360,7 +367,7 @@ export function DataTableFilter<TData>({
                   type="button"
                   data-testid="filter-select-all"
                   onClick={handleSelectAllCurrent}
-                  className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer transition-colors"
+                  className="text-telkom-navy hover:text-[#001f4d] font-semibold cursor-pointer transition-colors"
                 >
                   Select all
                 </button>
@@ -388,7 +395,7 @@ export function DataTableFilter<TData>({
                       data-testid={`filter-option-${opt.value}`}
                       onClick={() => handleToggleOption(opt.value)}
                       className={cn(
-                        "group flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-700 transition-all cursor-pointer select-none",
+                        "group flex items-center gap-2.5 px-2 py-1.5 rounded-md text-slate-700 transition-all cursor-pointer select-none",
                         isChecked ? "bg-slate-50/80" : "hover:bg-slate-100/70"
                       )}
                     >

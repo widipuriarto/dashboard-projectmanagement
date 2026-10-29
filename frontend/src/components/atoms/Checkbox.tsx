@@ -40,7 +40,7 @@ export function Checkbox({
         disabled
           ? "bg-slate-200 text-white cursor-not-allowed opacity-90"
           : checked
-          ? "bg-[#1877F2] text-white hover:bg-[#166fe5] cursor-pointer shadow-xs"
+          ? "bg-telkom-navy text-white hover:bg-[#001f4d] cursor-pointer shadow-none"
           : "border-2 border-slate-300 bg-white hover:border-slate-400 cursor-pointer",
         className
       )}

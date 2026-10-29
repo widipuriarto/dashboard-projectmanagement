@@ -130,7 +130,7 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
           data-testid="input-pm"
           placeholder="Autofilled by Segmen"
           value={formData.pm}
-          className="bg-slate-100 text-slate-700 font-medium cursor-not-allowed border-slate-400 select-all placeholder:italic placeholder:text-xs"
+          className="bg-slate-100 text-slate-700 font-medium cursor-not-allowed border-slate-400 select-all placeholder:text-xs"
         />
       </FormField>
 
@@ -140,7 +140,7 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
           readOnly
           placeholder="Autofilled by Tanggal Request & Close DR"
           value={liveSlaDays === "-" ? "" : liveSlaDays}
-          className="bg-slate-100 text-slate-700 font-medium cursor-not-allowed border-slate-400 select-all placeholder:italic placeholder:text-xs"
+          className="bg-slate-100 text-slate-700 font-medium cursor-not-allowed border-slate-400 select-all placeholder:text-xs"
         />
       </FormField>
 
@@ -170,7 +170,7 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
           data-testid="input-tahun-bast"
           placeholder="Autofilled by Tanggal BAST"
           value={formData.tahun_bast != null ? String(formData.tahun_bast) : ""}
-          className="bg-slate-100 text-slate-700 font-medium cursor-not-allowed border-slate-400 select-all placeholder:italic placeholder:text-xs"
+          className="bg-slate-100 text-slate-700 font-medium cursor-not-allowed border-slate-400 select-all placeholder:text-xs"
         />
       </FormField>
 
@@ -181,7 +181,7 @@ export const ProjectFormBast = React.memo(function ProjectFormBast({
           placeholder="Catatan update progress..."
           value={formData.ket_update}
           onChange={(e) => updateField("ket_update", e.target.value)}
-          className="w-full p-3 rounded-lg border border-slate-400 hover:border-slate-500 bg-white text-sm text-slate-800 placeholder:text-slate-400 transition-all outline-none focus:border-telkom-navy focus:ring-0 resize-y"
+          className="w-full p-3 rounded-md border border-slate-400 hover:border-slate-500 bg-white text-sm text-slate-800 placeholder:text-slate-400 transition-all outline-none focus:border-telkom-navy focus:ring-0 resize-y"
         />
       </FormField>
     </FormSection>

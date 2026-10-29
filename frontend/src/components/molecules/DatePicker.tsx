@@ -151,7 +151,7 @@ export function DatePicker({
         disabled={disabled}
         type="button"
         className={cn(
-          "w-full h-10 px-3 rounded-lg border bg-white text-sm transition-all flex items-center justify-between text-left outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0 select-none cursor-pointer group",
+          "w-full h-10 px-3 rounded-md border bg-white text-sm transition-all flex items-center justify-between text-left outline-none focus:outline-none focus-visible:outline-none ring-0 focus:ring-0 focus-visible:ring-0 select-none cursor-pointer group",
           error
             ? "border-red-400 focus:border-red-500"
             : isOpen
@@ -189,14 +189,14 @@ export function DatePicker({
         align="start"
         side="bottom"
         sideOffset={6}
-        className="w-[300px] p-3 rounded-2xl border-none bg-white shadow-xl z-50 duration-75 hide-scrollbar"
+        className="w-[300px] p-3 rounded-md border-none bg-white shadow-xl z-50 duration-75 hide-scrollbar"
       >
         {/* Calendar Header with Month/Year Navigation */}
         <div className="flex items-center justify-between mb-3 px-1">
           <button
             type="button"
             onClick={handlePrevMonth}
-            className="h-7 w-7 rounded-lg border border-slate-200/80 hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-md border border-slate-200/80 hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
             title="Previous month"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -230,7 +230,7 @@ export function DatePicker({
           <button
             type="button"
             onClick={handleNextMonth}
-            className="h-7 w-7 rounded-lg border border-slate-200/80 hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
+            className="h-7 w-7 rounded-md border border-slate-200/80 hover:bg-slate-100 flex items-center justify-center text-slate-600 hover:text-slate-900 transition-colors cursor-pointer"
             title="Next month"
           >
             <ChevronRight className="h-4 w-4" />
@@ -262,7 +262,7 @@ export function DatePicker({
                       setIsYearPickerOpen(false);
                     }}
                     className={cn(
-                      "h-9 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center justify-center border-0 outline-none select-none",
+                      "h-9 rounded-md text-xs font-semibold transition-all cursor-pointer flex items-center justify-center border-0 outline-none select-none",
                       isSelectedYear
                         ? "bg-telkom-navy text-white shadow-xs font-bold"
                         : isSystemYear
@@ -321,7 +321,7 @@ export function DatePicker({
                     type="button"
                     onClick={() => handleSelectDay(dayNum)}
                     className={cn(
-                      "h-8 w-8 mx-auto flex items-center justify-center text-xs rounded-lg transition-all cursor-pointer font-medium border-0 outline-none",
+                      "h-8 w-8 mx-auto flex items-center justify-center text-xs rounded-md transition-all cursor-pointer font-medium border-0 outline-none",
                       isSelected
                         ? "bg-telkom-navy text-white font-semibold shadow-xs hover:bg-telkom-navy"
                         : isToday

@@ -1,69 +1,95 @@
-import { useEffect, useState, useRef, useMemo } from "react";
+import { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { DataTable } from "@/components/organisms/DataTable";
-import {
-  columns,
-  STORAGE_KEY_HIGHEST_SEQ,
-  STORAGE_KEY_HIGHEST_NOMOR,
-  type ProjectPM,
-} from "@/components/organisms/columns";
+import { columns } from "@/components/organisms/columns";
+import type { ProjectPM } from "@/types/project";
+import { compareProjectsBySeq, syncHighWaterMarks } from "@/lib/projectSequence";
 import { ProjectForm, type ProjectFormHandle } from "@/components/organisms/ProjectForm";
 import { DeleteConfirmationModal } from "@/components/molecules/DeleteConfirmationModal";
+import { RestoreConfirmationModal } from "@/components/molecules/RestoreConfirmationModal";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/context/ToastContext";
-
-function extractProjectSeqNumber(id?: string | null): number {
-  if (!id) return 0;
-  const match = String(id).match(/(\d+)$/);
-  return match ? parseInt(match[0], 10) : 0;
-}
-
-export function compareProjectsBySeq(a: ProjectPM, b: ProjectPM): number {
-  const numA = extractProjectSeqNumber(a.project_id_pm);
-  const numB = extractProjectSeqNumber(b.project_id_pm);
-  if (numA !== numB) {
-    return numA - numB;
-  }
-  return (a.nomor || 0) - (b.nomor || 0);
-}
 
 export default function Repository() {
   const [data, setData] = useState<ProjectPM[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchParams, setSearchParams] = useSearchParams();
   const [highlightedRowId, setHighlightedRowId] = useState<string | null>(null);
+  const [highlightVariant, setHighlightVariant] = useState<"sky" | "grey">("sky");
+  const highlightTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Modals state for Delete and Restore
   const [projectToDelete, setProjectToDelete] = useState<ProjectPM | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [projectToRestore, setProjectToRestore] = useState<ProjectPM | null>(null);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const lastRestoredIdRef = useRef<string | null>(null);
+
   const projectFormRef = useRef<ProjectFormHandle>(null);
   const { showToast } = useToast();
 
+  const triggerRowHighlight = useCallback((id: string, variant: "sky" | "grey" = "sky") => {
+    if (highlightTimeoutRef.current) {
+      clearTimeout(highlightTimeoutRef.current);
+    }
+    setHighlightedRowId(id);
+    setHighlightVariant(variant);
+    highlightTimeoutRef.current = setTimeout(() => {
+      setHighlightedRowId(null);
+      setHighlightVariant("sky");
+    }, 5000);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (highlightTimeoutRef.current) {
+        clearTimeout(highlightTimeoutRef.current);
+      }
+    };
+  }, []);
+
   const actionParam = searchParams.get("action");
   const editId = searchParams.get("id");
+  const viewParam = searchParams.get("view");
+  const isTrashMode = viewParam === "trash";
+
   const isCreateMode = actionParam === "create";
   const isEditMode = actionParam === "edit" && Boolean(editId);
+
+  // Separate active projects and soft-deleted projects
+  const activeProjects = useMemo(() => data.filter((p) => !p.deleted_at), [data]);
+  const trashProjects = useMemo(() => {
+    return data
+      .filter((p) => Boolean(p.deleted_at))
+      .sort((a, b) => {
+        const timeA = a.deleted_at ? new Date(a.deleted_at).getTime() : 0;
+        const timeB = b.deleted_at ? new Date(b.deleted_at).getTime() : 0;
+        return timeB - timeA;
+      });
+  }, [data]);
 
   const editingProject = useMemo(() => {
     if (!isEditMode || !editId) return null;
     return (
-      data.find(
+      activeProjects.find(
         (p) =>
           String(p.project_id_pm) === editId ||
           String(p.id) === editId ||
           String(p.nomor) === editId
       ) || null
     );
-  }, [data, isEditMode, editId]);
+  }, [activeProjects, isEditMode, editId]);
 
   const isFormOpen = isCreateMode || (isEditMode && Boolean(editingProject));
 
   // Reset URL if invalid edit id is provided and data has finished loading
   useEffect(() => {
-    if (!isLoading && isEditMode && !editingProject && data.length > 0) {
+    if (!isLoading && isEditMode && !editingProject && activeProjects.length > 0) {
       console.warn(`Project with id "${editId}" not found in repository`);
       setSearchParams({});
     }
-  }, [isLoading, isEditMode, editingProject, data.length, editId, setSearchParams]);
+  }, [isLoading, isEditMode, editingProject, activeProjects.length, editId, setSearchParams]);
 
   useEffect(() => {
     async function fetchProjects() {
@@ -79,35 +105,8 @@ export default function Repository() {
         }
 
         if (projects) {
-          // Initialize highest high-water mark for sequence and nomor in localStorage
-          let maxSeq = 0;
-          let maxNomor = 0;
-          projects.forEach((p) => {
-            const match = String(p.project_id_pm || "").match(/(\d+)$/);
-            if (match) {
-              const n = parseInt(match[1], 10);
-              if (!isNaN(n) && n > maxSeq) maxSeq = n;
-            }
-            const nm = typeof p.nomor === "number" ? p.nomor : parseInt(String(p.nomor), 10);
-            if (!isNaN(nm) && nm > maxNomor) maxNomor = nm;
-          });
-
-          try {
-            const storedSeq = parseInt(localStorage.getItem(STORAGE_KEY_HIGHEST_SEQ) || "0", 10);
-            if (maxSeq > storedSeq) {
-              localStorage.setItem(STORAGE_KEY_HIGHEST_SEQ, String(maxSeq));
-            }
-            const storedNomor = parseInt(localStorage.getItem(STORAGE_KEY_HIGHEST_NOMOR) || "0", 10);
-            if (maxNomor > storedNomor) {
-              localStorage.setItem(STORAGE_KEY_HIGHEST_NOMOR, String(maxNomor));
-            }
-          } catch (e) {
-            console.error("Failed to sync highest sequence to localStorage", e);
-          }
-
-          // Sort by sequential number at the trailing edge of project_id_pm
+          syncHighWaterMarks(projects as ProjectPM[]);
           const sortedProjects = [...projects].sort(compareProjectsBySeq);
-          
           setData(sortedProjects as ProjectPM[]);
         }
       } catch (err) {
@@ -128,6 +127,22 @@ export default function Repository() {
     setSearchParams({ action: "edit", id: String(project.project_id_pm || project.id) });
   };
 
+  const handleTrashClick = () => {
+    if (isTrashMode) {
+      handleBackFromTrash();
+    } else {
+      setSearchParams({ view: "trash" });
+    }
+  };
+
+  const handleBackFromTrash = () => {
+    setSearchParams({});
+    if (lastRestoredIdRef.current) {
+      triggerRowHighlight(lastRestoredIdRef.current, "sky");
+      lastRestoredIdRef.current = null;
+    }
+  };
+
   const handleDeleteClick = (project: ProjectPM) => {
     setProjectToDelete(project);
   };
@@ -143,56 +158,106 @@ export default function Repository() {
     setIsDeleting(true);
 
     try {
-      let query = supabase.from("projects").delete();
-      if (projectToDelete.id) {
-        query = query.eq("id", projectToDelete.id);
-      } else if (projectToDelete.nomor) {
-        query = query.eq("nomor", projectToDelete.nomor);
-      } else {
-        query = query.eq("project_id_pm", projectToDelete.project_id_pm);
-      }
+      const targetId = projectToDelete.id;
+      const targetNomor = projectToDelete.nomor;
+      const targetProjectIdPm = projectToDelete.project_id_pm;
 
-      const { error } = await query;
+      if (isTrashMode) {
+        // Permanent delete from Supabase
+        let query = supabase.from("projects").delete();
+        if (targetId) {
+          query = query.eq("id", targetId);
+        } else if (targetNomor) {
+          query = query.eq("nomor", targetNomor);
+        } else {
+          query = query.eq("project_id_pm", targetProjectIdPm);
+        }
 
-      if (error) {
-        console.error("Failed to delete project:", error);
+        const { error } = await query;
+
+        if (error) {
+          console.error("Failed to permanently delete project:", error);
+          showToast({
+            type: "error",
+            title: "Failed to Delete Project",
+            description: error.message || "Failed to permanently delete project from database.",
+            duration: 5000,
+          });
+          return;
+        }
+
+        setData((prev) =>
+          prev.filter((p) => {
+            if (targetId && p.id === targetId) return false;
+            if (targetNomor && p.nomor === targetNomor) return false;
+            return p.project_id_pm !== targetProjectIdPm;
+          })
+        );
+
         showToast({
-          type: "error",
-          title: "Failed to Delete Project",
-          description: error.message || "Failed to delete project from database.",
+          type: "success",
+          title: "Project Permanently Deleted",
+          description: `${targetProjectIdPm} has been permanently deleted from database.`,
           duration: 5000,
         });
-        return;
+      } else {
+        // Soft delete: stamp deleted_at timestamp
+        const deletedAt = new Date().toISOString();
+        let query = supabase
+          .from("projects")
+          .update({ deleted_at: deletedAt });
+
+        if (targetId) {
+          query = query.eq("id", targetId);
+        } else if (targetNomor) {
+          query = query.eq("nomor", targetNomor);
+        } else {
+          query = query.eq("project_id_pm", targetProjectIdPm);
+        }
+
+        const { error } = await query;
+
+        if (error) {
+          console.error("Failed to soft-delete project:", error);
+          showToast({
+            type: "error",
+            title: "Failed to Delete Project",
+            description: error.message || "Failed to move project to Trash.",
+            duration: 5000,
+          });
+          return;
+        }
+
+        setData((prev) =>
+          prev.map((p) => {
+            const isMatch =
+              (targetId && p.id === targetId) ||
+              (targetNomor && p.nomor === targetNomor) ||
+              p.project_id_pm === targetProjectIdPm;
+            return isMatch ? { ...p, deleted_at: deletedAt } : p;
+          })
+        );
+
+        showToast({
+          type: "success",
+          title: "Project Successfully Deleted",
+          description: `${targetProjectIdPm} moved to Trash. You can restore it anytime.`,
+          duration: 5000,
+        });
       }
-
-      const deletedName = projectToDelete.nama_proyek || projectToDelete.project_id_pm;
-
-      setData((prev) =>
-        prev.filter((p) => {
-          if (projectToDelete.id && p.id === projectToDelete.id) return false;
-          if (projectToDelete.nomor && p.nomor === projectToDelete.nomor) return false;
-          return p.project_id_pm !== projectToDelete.project_id_pm;
-        })
-      );
 
       if (highlightedRowId === projectToDelete.project_id_pm) {
         setHighlightedRowId(null);
       }
 
-      showToast({
-        type: "success",
-        title: "Project Successfully Deleted",
-        description: `${deletedName} successfully deleted.`,
-        duration: 5000,
-      });
-
       setProjectToDelete(null);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Unexpected error deleting project:", err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
       showToast({
         type: "error",
         title: "Unexpected Error",
-        description: err.message || String(err),
+        description: errorMsg,
         duration: 5000,
       });
     } finally {
@@ -200,19 +265,106 @@ export default function Repository() {
     }
   };
 
+  const handleRestoreClick = (project: ProjectPM) => {
+    setProjectToRestore(project);
+  };
+
+  const handleCancelRestore = () => {
+    if (!isRestoring) {
+      setProjectToRestore(null);
+    }
+  };
+
+  const handleConfirmRestore = async () => {
+    if (!projectToRestore) return;
+    setIsRestoring(true);
+
+    try {
+      const targetId = projectToRestore.id;
+      const targetNomor = projectToRestore.nomor;
+      const targetProjectIdPm = projectToRestore.project_id_pm;
+
+      let query = supabase
+        .from("projects")
+        .update({ deleted_at: null });
+
+      if (targetId) {
+        query = query.eq("id", targetId);
+      } else if (targetNomor) {
+        query = query.eq("nomor", targetNomor);
+      } else {
+        query = query.eq("project_id_pm", targetProjectIdPm);
+      }
+
+      const { error } = await query;
+
+      if (error) {
+        console.error("Failed to restore project:", error);
+        showToast({
+          type: "error",
+          title: "Failed to Restore Project",
+          description: error.message || "Failed to restore project from Trash.",
+          duration: 5000,
+        });
+        return;
+      }
+
+      // Update local state: reset deleted_at and preserve sorting
+      setData((prev) => {
+        const next = prev.map((p) => {
+          const isMatch =
+            (targetId && p.id === targetId) ||
+            (targetNomor && p.nomor === targetNomor) ||
+            p.project_id_pm === targetProjectIdPm;
+          return isMatch ? { ...p, deleted_at: null } : p;
+        });
+        return next.sort(compareProjectsBySeq);
+      });
+
+      // Track last restored project ID for highlight & scroll upon returning to active repository
+      lastRestoredIdRef.current = targetProjectIdPm;
+
+      showToast({
+        type: "success",
+        title: "Project Successfully Restored",
+        description: `${targetProjectIdPm} successfully restored to active repository.`,
+        duration: 5000,
+      });
+
+      setProjectToRestore(null);
+    } catch (err: unknown) {
+      console.error("Unexpected error restoring project:", err);
+      const errorMsg = err instanceof Error ? err.message : String(err);
+      showToast({
+        type: "error",
+        title: "Unexpected Error",
+        description: errorMsg,
+        duration: 5000,
+      });
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   const handleBackClick = () => {
     if (projectFormRef.current) {
       projectFormRef.current.attemptCancel();
     } else {
+      if (isEditMode && editingProject) {
+        triggerRowHighlight(editingProject.project_id_pm, "grey");
+      }
       setSearchParams({});
     }
   };
 
   const handleFormCancel = () => {
+    if (isEditMode && editingProject) {
+      triggerRowHighlight(editingProject.project_id_pm, "grey");
+    }
     setSearchParams({});
   };
 
-  const handleFormSuccess = (savedProject: any) => {
+  const handleFormSuccess = (savedProject: Partial<ProjectPM> & { project_id_pm: string }) => {
     setData((prev) => {
       const matchIndex = prev.findIndex(
         (p) =>
@@ -233,13 +385,35 @@ export default function Repository() {
       return nextData.sort(compareProjectsBySeq);
     });
 
-    setHighlightedRowId(savedProject.project_id_pm);
+    triggerRowHighlight(savedProject.project_id_pm, "sky");
     setSearchParams({});
+  };
 
-    // Auto-remove highlight after 5 seconds
-    setTimeout(() => {
-      setHighlightedRowId(null);
-    }, 5000);
+  const handleExportExcel = async () => {
+    if (activeProjects.length === 0) {
+      showToast({
+        type: "error",
+        title: "Export Gagal",
+        description: "Tidak ada data proyek aktif untuk diekspor.",
+      });
+      return;
+    }
+    try {
+      const { exportProjectsToExcel } = await import("@/lib/exportUtils");
+      await exportProjectsToExcel(activeProjects);
+      showToast({
+        type: "success",
+        title: "Export Berhasil",
+        description: "File Excel (.xlsx) berhasil diunduh.",
+      });
+    } catch (err: unknown) {
+      console.error("Failed to export Excel file:", err);
+      showToast({
+        type: "error",
+        title: "Export Gagal",
+        description: "Terjadi kesalahan saat memproses file Excel.",
+      });
+    }
   };
 
   return (
@@ -248,7 +422,7 @@ export default function Repository() {
       <div>
         <h1 className="text-xl md:text-2xl font-bold text-telkom-navy tracking-tight">Master Repository</h1>
         <p className="text-xs sm:text-sm text-slate-500 mt-0.5 md:mt-1">
-          New Populasi Project
+          {isTrashMode ? "Trash / Deleted Projects" : "New Populasi Project"}
         </p>
       </div>
 
@@ -256,12 +430,18 @@ export default function Repository() {
       <div className="flex-1 min-h-0 flex flex-col">
         <DataTable 
           columns={columns} 
-          data={data} 
+          data={isTrashMode ? trashProjects : activeProjects} 
           isLoading={isLoading}
           isFormMode={isFormOpen}
+          isTrashMode={isTrashMode}
           highlightedRowId={highlightedRowId}
+          highlightVariant={highlightVariant}
           onEdit={handleEditClick}
           onDelete={handleDeleteClick}
+          onRestore={handleRestoreClick}
+          onPermanentDelete={handleDeleteClick}
+          onTrashClick={handleTrashClick}
+          onExportExcel={handleExportExcel}
           createFormSlot={
             <ProjectForm
               ref={projectFormRef}
@@ -279,37 +459,60 @@ export default function Repository() {
                 size="lg"
                 variant="outline"
                 onClick={handleBackClick}
-                className="w-full md:w-auto bg-white border border-transparent text-slate-700 hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100 rounded-md shadow-sm hover:shadow transition-all h-10 px-2 sm:px-4 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
+                className="w-full md:w-[120px] bg-white border border-slate-300/80 text-slate-700 hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100 rounded-md shadow-none transition-all h-10 min-h-10 max-h-10 shrink-0 px-2 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-2 sm:gap-2.5"
               >
                 <span className="material-symbols-outlined text-[18px] sm:text-[20px] select-none leading-none">
                   arrow_back
                 </span>
-                <span className="truncate">Back</span>
+                <span className="whitespace-nowrap">Back</span>
+              </Button>
+            ) : isTrashMode ? (
+              <Button
+                data-testid="btn-back-trash"
+                size="lg"
+                variant="outline"
+                onClick={handleBackFromTrash}
+                className="w-full md:w-[120px] bg-white border border-slate-300/80 text-slate-700 hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100 rounded-md shadow-none transition-all h-10 min-h-10 max-h-10 shrink-0 px-2 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-2 sm:gap-2.5"
+              >
+                <span className="material-symbols-outlined text-[18px] sm:text-[20px] select-none leading-none">
+                  arrow_back
+                </span>
+                <span className="whitespace-nowrap">Back</span>
               </Button>
             ) : (
               <Button
                 data-testid="btn-add-project"
                 size="lg"
                 onClick={handleAddClick}
-                className="w-full md:w-auto bg-telkom-navy text-white hover:bg-[#003d82] active:bg-[#002047] rounded-md shadow-sm hover:shadow-md transition-all h-10 px-2 sm:px-4 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-2"
+                className="w-full md:w-[120px] bg-telkom-navy text-white hover:bg-[#003d82] active:bg-[#002047] border border-transparent rounded-md shadow-none transition-all h-10 min-h-10 max-h-10 shrink-0 px-1.5 sm:px-2 cursor-pointer text-xs sm:text-sm font-medium flex items-center justify-center gap-1 sm:gap-1.5"
               >
                 <span className="material-symbols-outlined text-[18px] sm:text-[20px] select-none leading-none">
                   add
                 </span>
-                <span className="truncate">Add Project</span>
+                <span className="whitespace-nowrap">Add Project</span>
               </Button>
             )
           }
         />
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Delete Confirmation Modal (Soft delete in repository, permanent delete in trash) */}
       <DeleteConfirmationModal
         isOpen={Boolean(projectToDelete)}
         project={projectToDelete}
         isDeleting={isDeleting}
+        isPermanent={isTrashMode}
         onCancel={handleCancelDelete}
         onConfirm={handleConfirmDelete}
+      />
+
+      {/* Restore Confirmation Modal */}
+      <RestoreConfirmationModal
+        isOpen={Boolean(projectToRestore)}
+        project={projectToRestore}
+        isRestoring={isRestoring}
+        onCancel={handleCancelRestore}
+        onConfirm={handleConfirmRestore}
       />
     </div>
   );

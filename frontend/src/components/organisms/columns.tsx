@@ -1,38 +1,24 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { StatusBadge } from "@/components/atoms/StatusBadge";
 import { Button } from "@/components/ui/button";
-import { Edit, Trash2, ArrowUp, ArrowDown } from "lucide-react";
+import { Edit, Trash2 } from "lucide-react";
 import { MicrosoftTeamsIcon } from "@/components/atoms/MicrosoftTeamsIcon";
+import { OrderSidExpandButton } from "@/components/atoms/OrderSidExpandButton";
+import { ProjectIdSortHeader } from "@/components/molecules/ProjectIdSortHeader";
 import { cn } from "@/lib/utils";
-
-export type ProjectPM = Record<string, any>;
-
-// Top-level singleton formatters to prevent garbage collection pauses during virtual scrolling
-export const idrCurrencyFormatter = new Intl.NumberFormat("id-ID", {
-  style: "currency",
-  currency: "IDR",
-  maximumFractionDigits: 0,
-});
-
-export const monthYearFormatter = new Intl.DateTimeFormat("id-ID", {
-  month: "long",
-  year: "numeric",
-});
-
-export const dateTimeFormatter = new Intl.DateTimeFormat("id-ID", {
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-  hour: "2-digit",
-  minute: "2-digit",
-});
-
-export const formatDateTime = (val?: string | null): string => {
-  if (!val) return "-";
-  const date = new Date(val);
-  if (isNaN(date.getTime())) return String(val);
-  return dateTimeFormatter.format(date);
-};
+import { normalizeOrdersData, flattenOrderSidPairs } from "@/lib/orderParser";
+import {
+  idrCurrencyFormatter,
+  monthYearFormatter,
+  formatDateTime,
+} from "@/lib/formatters";
+import type { ProjectPM, ProjectTableMeta } from "@/types/project";
+import {
+  multiSelectFilterFn,
+  slaBastFilterFn,
+  monthYearFilterFn,
+  sortProjectByIdPm,
+} from "@/lib/table-constants";
 
 const formatMonthYear = (val?: string | null) => {
   if (!val) return <span className="text-slate-400">-</span>;
@@ -56,267 +42,109 @@ const formatMonthYear = (val?: string | null) => {
   );
 };
 
+function formatOrderDisplayText(item: { order_id?: string; order_label?: string }): string {
+  if (!item.order_id && !item.order_label) return "-";
+  const rawOrder = (item.order_id || "").trim();
+  const label = (item.order_label || "").trim();
 
-export const MANDATORY_COLUMN_IDS = ["actions", "nomor", "project_id_pm"] as const;
+  if (!label) return rawOrder || "-";
+  if (!rawOrder) return label || "-";
 
-export const OVERFLOW_ENABLED_COLUMN_IDS = [
-  "nama_proyek",
-  "nama_mitra",
-  "nama_pelanggan",
-  "idlop",
-  "nomor_kl_sp_wo_nopes",
-  "note_email_handover",
-  "no_bast_telkom",
-  "ket_update",
-] as const;
-
-export const OVERFLOW_POPOVER_COLUMN_IDS = OVERFLOW_ENABLED_COLUMN_IDS;
-
-export const STORAGE_KEY_VISIBILITY = "pm_rso1_column_visibility";
-export const STORAGE_KEY_ORDER = "pm_rso1_column_order";
-export const STORAGE_KEY_FILTERS = "pm_rso1_column_filters";
-export const STORAGE_KEY_SORTING = "pm_rso1_column_sorting";
-export const STORAGE_KEY_HIGHEST_SEQ = "pm_rso1_highest_project_seq";
-export const STORAGE_KEY_HIGHEST_NOMOR = "pm_rso1_highest_nomor";
-
-export const COLUMN_DISPLAY_TITLES: Record<string, string> = {
-  actions: "Aksi",
-  nomor: "No.",
-  project_id_pm: "ID Project PM",
-  segment: "Segment",
-  witel: "Witel",
-  nama_proyek: "Nama Proyek",
-  nama_mitra: "Nama Mitra",
-  nama_pelanggan: "Nama Pelanggan",
-  idlop: "IDLOP",
-  jenis_kontrak: "Jenis Kontrak",
-  nomor_kl_sp_wo_nopes: "Nomor KL/SP/WO/NOPES",
-  tgl_kontrak: "Tgl Kontrak",
-  tahun_kontrak: "Tahun Kontrak",
-  nilai_kontrak_obl: "Nilai Kontrak OBL",
-  quote_number: "Quote Number",
-  status_email_handover: "Status Email Handover",
-  note_email_handover: "Note Email Handover",
-  status_dokumen_obl: "Status Dokumen OBL",
-  no_order: "No Order",
-  sid: "SID",
-  jenis_layanan: "Jenis Layanan",
-  status_delivery_project: "Status Delivery Project",
-  jenis_dok_delivery: "Jenis Dok Delivery",
-  status_dokumen_delivery: "Status Dokumen Delivery",
-  id_digireview: "ID Digireview",
-  tanggal_request_dr: "Tanggal Request DR",
-  tanggal_close_dr: "Tanggal Close DR",
-  no_bast_telkom: "No BAST Telkom",
-  tanggal_bast: "Tanggal BAST",
-  tahun_bast: "Tahun BAST",
-  pm: "PM",
-  sla_bast: "Waktu Penyelesaian BAST",
-  waktu_penyelesaian_bast: "Waktu Penyelesaian BAST",
-  ket_update: "Ket Update",
-  status_order: "Status Order",
-  komitmen_bc: "Komitmen BC",
-  bulan_bc: "Bulan BC",
-  file_bast: "File BAST",
-  file_bapl: "File BAPL",
-  status_gr: "Status GR",
-  hardfile_bast: "Hardfile BAST",
-  created_at: "Created At",
-  updated_at: "Updated At",
-};
-
-export function getColumnDisplayTitle(columnId: string): string {
-  if (COLUMN_DISPLAY_TITLES[columnId]) {
-    return COLUMN_DISPLAY_TITLES[columnId];
+  // Prevent duplicate label prefix if rawOrder already contains it
+  const prefixRegex = new RegExp(`^${label}\\s*[:=-]\\s*`, "i");
+  if (prefixRegex.test(rawOrder)) {
+    return rawOrder;
   }
-  return columnId
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+
+  return `${label} : ${rawOrder}`;
 }
 
-export const multiSelectFilterFn = (
-  row: any,
-  columnId: string,
-  filterValues: string[]
-): boolean => {
-  if (!filterValues || filterValues.length === 0) return true;
-  const rawValue = row.getValue(columnId);
-  const cellValue = rawValue != null && String(rawValue).trim() !== "" ? String(rawValue).trim() : "-";
-  return filterValues.includes(cellValue);
-};
+function formatSidDisplayText(item: { sid?: string; sid_label?: string }): string {
+  if (!item.sid && !item.sid_label) return "-";
+  const rawSid = (item.sid || "").trim();
+  const label = (item.sid_label || "").trim();
 
-export const getSlaCategory = (
-  daysOrReqDr?: number | string | null,
-  closeDrStr?: string | null
-): string => {
-  let diffDays: number | null = null;
+  if (!label) return rawSid || "-";
+  if (!rawSid) return label || "-";
 
-  if (typeof daysOrReqDr === "number") {
-    diffDays = daysOrReqDr;
-  } else if (daysOrReqDr != null && !closeDrStr && !isNaN(Number(daysOrReqDr))) {
-    diffDays = Number(daysOrReqDr);
-  } else if (daysOrReqDr && closeDrStr) {
-    const reqDate = new Date(String(daysOrReqDr));
-    const closeDate = new Date(closeDrStr);
-    if (!isNaN(reqDate.getTime()) && !isNaN(closeDate.getTime())) {
-      const diffTime = Math.abs(closeDate.getTime() - reqDate.getTime());
-      diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }
+  // Prevent duplicate label prefix if rawSid already contains it
+  const prefixRegex = new RegExp(`^${label}\\s*[:=-]\\s*`, "i");
+  if (prefixRegex.test(rawSid)) {
+    return rawSid;
   }
 
-  if (diffDays === null || isNaN(diffDays)) return "-";
-  if (diffDays <= 7) return "<= 7 Hari";
-  if (diffDays >= 8 && diffDays <= 10) return "8 - 10 Hari";
-  return "> 10 Hari";
-};
-
-export const slaBastFilterFn = (
-  row: any,
-  _columnId: string,
-  filterValues: string[]
-): boolean => {
-  if (!filterValues || filterValues.length === 0) return true;
-  const dbVal = row.getValue("waktu_penyelesaian_bast");
-  const cat = dbVal != null
-    ? getSlaCategory(Number(dbVal))
-    : getSlaCategory(
-        row.original.tanggal_request_dr,
-        row.original.tanggal_close_dr
-      );
-  return filterValues.includes(cat);
-};
-
-export const formatMonthYearKey = (val?: string | null): string => {
-  if (!val) return "-";
-  const match = String(val).match(/^(\d{4})-(\d{2})/);
-  if (match) {
-    const year = parseInt(match[1], 10);
-    const month = parseInt(match[2], 10) - 1;
-    const date = new Date(year, month, 1);
-    return monthYearFormatter.format(date);
+  if (label.startsWith("(")) {
+    return `${rawSid} ${label}`;
   }
-  const date = new Date(val);
-  if (isNaN(date.getTime())) return String(val).trim() || "-";
-  return monthYearFormatter.format(date);
-};
-
-export const monthYearFilterFn = (
-  row: any,
-  columnId: string,
-  filterValues: string[]
-): boolean => {
-  if (!filterValues || filterValues.length === 0) return true;
-  const raw = row.getValue(columnId);
-  const formatted = formatMonthYearKey(raw);
-  return filterValues.includes(formatted);
-};
-
-export interface FilterCategory {
-  id: string;
-  label: string;
-}
-
-export const FILTER_CATEGORIES: FilterCategory[] = [
-  { id: "segment", label: "Segment" },
-  { id: "witel", label: "Witel" },
-  { id: "jenis_kontrak", label: "Jenis Kontrak" },
-  { id: "tahun_kontrak", label: "Tahun Kontrak" },
-  { id: "status_dokumen_obl", label: "Status Dok. OBL" },
-  { id: "status_delivery_project", label: "Status Delivery" },
-  { id: "status_dokumen_delivery", label: "Status Dok. Delivery" },
-  { id: "tahun_bast", label: "Tahun BAST" },
-  { id: "pm", label: "Project Manager" },
-  { id: "sla_bast", label: "Waktu Penyelesaian BAST" },
-  { id: "status_order", label: "Status Order" },
-  { id: "komitmen_bc", label: "Komitmen BC" },
-  { id: "bulan_bc", label: "Bulan BC" },
-  { id: "hardfile_bast", label: "Hardfile BAST" },
-];
-
-export const sortProjectByIdPm = (rowA: any, rowB: any, columnId: string): number => {
-  const getNum = (id: string) => {
-    if (!id) return 0;
-    const match = String(id).match(/(\d+)$/);
-    return match ? parseInt(match[0], 10) : 0;
-  };
-  const valA = rowA.getValue(columnId);
-  const valB = rowB.getValue(columnId);
-  const numA = getNum(valA);
-  const numB = getNum(valB);
-  if (numA !== numB) {
-    return numA - numB;
+  if (/^(lama|baru|old|new)$/i.test(label)) {
+    return `${label} : ${rawSid}`;
   }
-  return String(valA || "").localeCompare(String(valB || ""));
-};
-
-export function ProjectIdSortHeader({ column }: { column: any }) {
-  const isDesc = column.getIsSorted() === "desc";
-
-  const handleToggle = () => {
-    column.toggleSorting(!isDesc);
-  };
-
-  return (
-    <div className="relative flex items-center justify-center w-full min-h-[26px]">
-      <button
-        type="button"
-        data-testid="sort-project-id"
-        onClick={handleToggle}
-        className={cn(
-          "absolute -left-2.5 top-1/2 -translate-y-1/2 h-6.5 w-6.5 inline-flex items-center justify-center rounded-md transition-all cursor-pointer select-none outline-none",
-          "bg-transparent text-telkom-navy border border-transparent",
-          "hover:bg-white hover:shadow-2xs active:bg-slate-200/60 focus-visible:ring-2 focus-visible:ring-telkom-navy/30"
-        )}
-        title={
-          isDesc
-            ? "Urutan: Descending (Klik untuk Ascending)"
-            : "Urutan: Ascending (Klik untuk Descending)"
-        }
-        aria-label="Toggle sort order"
-      >
-        {isDesc ? (
-          <ArrowUp className="h-3.5 w-3.5 stroke-[2.5] text-telkom-navy" />
-        ) : (
-          <ArrowDown className="h-3.5 w-3.5 stroke-[2.5] text-telkom-navy" />
-        )}
-      </button>
-
-      <span className="font-semibold text-telkom-navy select-none text-center">
-        ID PROJECT PM
-      </span>
-    </div>
-  );
-}
-
-export interface ProjectTableMeta {
-  onEdit?: (project: ProjectPM) => void;
-  onDelete?: (project: ProjectPM) => void;
+  return `${rawSid} - ${label}`;
 }
 
 export const columns: ColumnDef<ProjectPM>[] = [
   {
     id: "actions",
     enableHiding: false,
-    header: () => <div className="text-center">Aksi</div>,
+    header: () => <div className="text-center">Action</div>,
     cell: ({ row, table }) => {
       const meta = table.options.meta as ProjectTableMeta | undefined;
+      const isTrash = Boolean(meta?.isTrashView);
+
+      if (isTrash) {
+        return (
+          <div className="flex items-center gap-2">
+            <Button
+              data-testid="row-actions-restore"
+              variant="ghost"
+              className="h-8 w-8 p-0 rounded-md cursor-pointer border border-emerald-600 text-emerald-600 bg-white hover:bg-emerald-600 hover:text-white hover:border-transparent active:bg-emerald-700 transition-all shadow-2xs flex items-center justify-center"
+              onClick={() => meta?.onRestore?.(row.original)}
+              title="Restore Project"
+              aria-label="Restore Project"
+            >
+              <span className="material-symbols-outlined text-[18px] leading-none select-none">
+                undo
+              </span>
+            </Button>
+            <Button
+              data-testid="row-actions-permanent-delete"
+              variant="ghost"
+              className="h-8 w-8 p-0 rounded-md cursor-pointer border border-red-500 text-red-500 bg-white hover:bg-red-500 hover:text-white hover:border-transparent active:bg-red-600 transition-all shadow-2xs flex items-center justify-center"
+              onClick={() => {
+                if (meta?.onPermanentDelete) {
+                  meta.onPermanentDelete(row.original);
+                } else if (meta?.onDelete) {
+                  meta.onDelete(row.original);
+                }
+              }}
+              title="Delete Project Permanently"
+              aria-label="Delete Project Permanently"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      }
+
       return (
         <div className="flex items-center gap-2">
           <Button
             data-testid="row-actions-edit"
             variant="ghost"
-            className="h-8 w-8 p-0 rounded-md cursor-pointer text-blue-500 hover:text-blue-700 hover:bg-blue-100 transition-colors"
+            className="h-8 w-8 p-0 rounded-md cursor-pointer border border-blue-500 text-blue-500 bg-transparent hover:bg-blue-500 hover:text-white hover:border-transparent active:bg-blue-600 transition-all shadow-2xs"
             onClick={() => meta?.onEdit?.(row.original)}
-            title="Edit Proyek"
+            title="Edit Project"
+            aria-label="Edit Project"
           >
             <Edit className="h-4 w-4" />
           </Button>
           <Button
             data-testid="row-actions-delete"
             variant="ghost"
-            className="h-8 w-8 p-0 rounded-md cursor-pointer text-red-500 hover:text-red-700 hover:bg-red-100 transition-colors"
+            className="h-8 w-8 p-0 rounded-md cursor-pointer border border-red-500 text-red-500 bg-transparent hover:bg-red-500 hover:text-white hover:border-transparent active:bg-red-600 transition-all shadow-2xs"
             onClick={() => meta?.onDelete?.(row.original)}
-            title="Hapus Proyek"
+            title="Delete Project"
+            aria-label="Delete Project"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -478,14 +306,166 @@ export const columns: ColumnDef<ProjectPM>[] = [
   },
   {
     accessorKey: "no_order",
-    header: () => <div className="text-center">No Order</div>,
-    cell: ({ row }) => <div className="text-center">{row.getValue("no_order") || "-"}</div>,
-    size: 150,
+    header: () => <div className="text-center font-semibold text-telkom-navy">No Order</div>,
+    size: 260,
+    minSize: 180,
+    cell: ({ row, table }) => {
+      const orders = normalizeOrdersData(row.original);
+      const pairs = flattenOrderSidPairs(orders);
+      if (pairs.length === 0) {
+        return <div className="text-center text-slate-400">-</div>;
+      }
+
+      const meta = table.options.meta as ProjectTableMeta | undefined;
+      const isExpanded = Boolean(meta?.expandedRows?.[row.id]);
+      const toggleExpand = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        meta?.toggleRowExpand?.(row.id);
+      };
+
+      const orderCount = orders.length;
+      const hasMultiple = pairs.length > 1;
+      const showButton = hasMultiple && orderCount > 1;
+
+      if (!isExpanded) {
+        const text = formatOrderDisplayText(pairs[0]);
+        return (
+          <div className="-mx-3 w-[calc(100%+1.5rem)] relative flex items-center justify-center min-h-[28px] px-14 min-w-0">
+            {showButton && (
+              <OrderSidExpandButton
+                count={orderCount}
+                isExpanded={false}
+                onToggle={toggleExpand}
+                position="left"
+              />
+            )}
+            <span
+              className="truncate block text-center font-medium text-slate-800 max-w-full"
+              title={text}
+            >
+              {text}
+            </span>
+          </div>
+        );
+      }
+
+      // Expanded View: height h-11 matches standard row height
+      return (
+        <div className="flex flex-col -mx-3 w-[calc(100%+1.5rem)] -my-1.5">
+          {pairs.map((p, idx) => {
+            const isDuplicateOrder = idx > 0 && p.order_id === pairs[idx - 1]?.order_id;
+            const text = isDuplicateOrder ? "" : formatOrderDisplayText(p);
+
+            return (
+              <div
+                key={idx}
+                className={cn(
+                  "relative flex items-center justify-center w-full h-11 px-14 min-w-0",
+                  idx > 0 && "border-t-[1.5px] border-slate-200"
+                )}
+              >
+                {showButton && idx === 0 && (
+                  <OrderSidExpandButton
+                    count={orderCount}
+                    isExpanded={true}
+                    onToggle={toggleExpand}
+                    position="left"
+                  />
+                )}
+                <span
+                  className={cn(
+                    "truncate block text-center max-w-full",
+                    isDuplicateOrder ? "text-slate-300 font-normal" : "font-medium text-slate-800"
+                  )}
+                  title={text}
+                >
+                  {text}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "sid",
-    header: "SID",
-    size: 150,
+    header: () => <div className="text-center font-semibold text-telkom-navy">SID</div>,
+    size: 260,
+    minSize: 180,
+    cell: ({ row, table }) => {
+      const orders = normalizeOrdersData(row.original);
+      const pairs = flattenOrderSidPairs(orders);
+      if (pairs.length === 0) {
+        return <div className="text-center text-slate-400">-</div>;
+      }
+
+      const meta = table.options.meta as ProjectTableMeta | undefined;
+      const isExpanded = Boolean(meta?.expandedRows?.[row.id]);
+      const toggleExpand = (e: React.MouseEvent) => {
+        e.stopPropagation();
+        meta?.toggleRowExpand?.(row.id);
+      };
+
+      const orderCount = orders.length;
+      const hasMultiple = pairs.length > 1;
+      const showButton = hasMultiple && orderCount <= 1;
+
+      if (!isExpanded) {
+        const text = formatSidDisplayText(pairs[0]);
+        return (
+          <div className="-mx-3 w-[calc(100%+1.5rem)] relative flex items-center justify-center min-h-[28px] px-14 min-w-0">
+            <span
+              className="truncate block text-center font-medium text-slate-800 max-w-full"
+              title={text}
+            >
+              {text}
+            </span>
+            {showButton && (
+              <OrderSidExpandButton
+                count={pairs.length}
+                isExpanded={false}
+                onToggle={toggleExpand}
+                position="right"
+              />
+            )}
+          </div>
+        );
+      }
+
+      // Expanded View: height h-11 matches standard row height
+      return (
+        <div className="flex flex-col -mx-3 w-[calc(100%+1.5rem)] -my-1.5">
+          {pairs.map((p, idx) => {
+            const text = formatSidDisplayText(p);
+            return (
+              <div
+                key={idx}
+                className={cn(
+                  "relative flex items-center justify-center w-full h-11 px-14 min-w-0",
+                  idx > 0 && "border-t-[1.5px] border-slate-200"
+                )}
+              >
+                <span
+                  className="truncate block text-center font-medium text-slate-800 max-w-full"
+                  title={text}
+                >
+                  {text}
+                </span>
+                {showButton && idx === 0 && (
+                  <OrderSidExpandButton
+                    count={pairs.length}
+                    isExpanded={true}
+                    onToggle={toggleExpand}
+                    position="right"
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      );
+    },
   },
   {
     accessorKey: "jenis_layanan",
@@ -746,8 +726,17 @@ export const columns: ColumnDef<ProjectPM>[] = [
   },
   {
     accessorKey: "updated_at",
-    header: "Updated At",
+    header: ({ table }) => {
+      const meta = table.options.meta as ProjectTableMeta | undefined;
+      return meta?.isTrashView ? "Deleted At" : "Updated At";
+    },
     size: 200,
-    cell: ({ row }) => formatDateTime(row.getValue("updated_at") as string),
+    cell: ({ row, table }) => {
+      const meta = table.options.meta as ProjectTableMeta | undefined;
+      const rawVal = meta?.isTrashView
+        ? (row.original as ProjectPM)?.deleted_at
+        : row.getValue("updated_at");
+      return formatDateTime(rawVal as string);
+    },
   },
 ];

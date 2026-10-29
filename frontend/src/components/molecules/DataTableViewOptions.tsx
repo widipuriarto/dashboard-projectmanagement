@@ -13,7 +13,7 @@ import {
   getColumnDisplayTitle,
   STORAGE_KEY_VISIBILITY,
   STORAGE_KEY_ORDER,
-} from "@/components/organisms/columns";
+} from "@/lib/table-constants";
 
 interface DataTableViewOptionsProps<TData> {
   table: Table<TData>;
@@ -78,15 +78,17 @@ export function DataTableViewOptions<TData>({
     [columnVisibility]
   );
 
+  const isTrashView = Boolean((table.options.meta as any)?.isTrashView);
+
   // Filter reorderable columns by search query
   const filteredReorderableCols = React.useMemo(() => {
     if (!searchQuery.trim()) return reorderableCols;
     const query = searchQuery.toLowerCase().trim();
     return reorderableCols.filter((col) => {
-      const title = getColumnDisplayTitle(col.id).toLowerCase();
+      const title = getColumnDisplayTitle(col.id, isTrashView).toLowerCase();
       return title.includes(query) || col.id.toLowerCase().includes(query);
     });
-  }, [reorderableCols, searchQuery]);
+  }, [reorderableCols, searchQuery, isTrashView]);
 
   // Count visible non-mandatory columns reactively
   const visibleReorderableCount = React.useMemo(() => {
@@ -224,7 +226,7 @@ export function DataTableViewOptions<TData>({
 
     // Create a sleek, compact floating drag preview pill instead of bulky browser ghost
     const dragGhost = document.createElement("div");
-    dragGhost.innerText = getColumnDisplayTitle(colId);
+    dragGhost.innerText = getColumnDisplayTitle(colId, isTrashView);
     dragGhost.style.position = "absolute";
     dragGhost.style.top = "-9999px";
     dragGhost.style.left = "-9999px";
@@ -323,12 +325,12 @@ export function DataTableViewOptions<TData>({
         disabled={disabled}
         className={cn(
           buttonVariants({ variant: "outline", size: "lg" }),
-          "group/options h-10 rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-4 gap-1.5 sm:gap-2 shadow-sm transition-all text-xs sm:text-sm",
+          "group/options h-10 min-h-10 max-h-10 shrink-0 w-full md:w-[120px] rounded-md flex items-center justify-center cursor-pointer px-2 sm:px-2.5 gap-1 sm:gap-1.5 transition-all text-xs sm:text-sm",
           disabled
             ? "!opacity-80 disabled:!opacity-80 pointer-events-none cursor-not-allowed !bg-slate-100/70 !border-slate-300 !text-slate-700 shadow-2xs"
             : isOpen
-            ? "border-telkom-navy bg-slate-50 text-telkom-navy shadow-inner"
-            : "border-transparent bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
+            ? "border-telkom-navy bg-slate-50 text-telkom-navy"
+            : "border-slate-300/80 bg-white hover:bg-slate-50 hover:border-telkom-navy hover:text-telkom-navy active:bg-slate-100",
           className
         )}
       >
@@ -346,7 +348,7 @@ export function DataTableViewOptions<TData>({
         </span>
         <span
           className={cn(
-            "font-medium truncate transition-colors",
+            "font-medium whitespace-nowrap transition-colors",
             disabled
               ? "!text-slate-700"
               : isOpen
@@ -358,7 +360,7 @@ export function DataTableViewOptions<TData>({
         </span>
       </PopoverTrigger>
 
-      <PopoverContent align="end" className="w-[calc(100vw-32px)] sm:w-80 max-w-80 p-3 shadow-xl border-none rounded-2xl">
+      <PopoverContent align="end" className="w-[calc(100vw-32px)] sm:w-80 max-w-80 p-3 shadow-md border border-telkom-navy rounded-md bg-white">
         {/* Search Input with refined hairline border */}
         <div className="relative mb-2.5">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none select-none" />
@@ -367,13 +369,13 @@ export function DataTableViewOptions<TData>({
             placeholder="Search columns..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full h-8 pl-8 pr-7 text-xs bg-slate-50/60 border border-slate-200/60 rounded-lg text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-telkom-navy/60 focus:ring-1 focus:ring-telkom-navy/20 transition-all"
+            className="w-full h-8 pl-8 pr-7 text-xs bg-slate-50/60 border border-slate-200/60 rounded-md text-slate-700 placeholder:text-slate-400 focus:bg-white focus:outline-none focus:border-telkom-navy/60 focus:ring-1 focus:ring-telkom-navy/20 transition-all"
           />
           {searchQuery && (
             <button
               type="button"
               onClick={() => setSearchQuery("")}
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-0.5 leading-none"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer p-0.5 leading-none rounded-md"
             >
               ✕
             </button>
@@ -390,7 +392,7 @@ export function DataTableViewOptions<TData>({
               type="button"
               data-testid="columns-show-all"
               onClick={handleShowAll}
-              className="text-blue-600 hover:text-blue-800 font-medium cursor-pointer transition-colors px-1"
+              className="text-telkom-navy hover:text-[#001f4d] font-semibold cursor-pointer transition-colors px-1 rounded-md"
             >
               Show all
             </button>
@@ -399,7 +401,7 @@ export function DataTableViewOptions<TData>({
               type="button"
               data-testid="columns-hide-all"
               onClick={handleHideAll}
-              className="text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors px-1"
+              className="text-slate-500 hover:text-slate-800 font-medium cursor-pointer transition-colors px-1 rounded-md"
             >
               Hide all
             </button>
@@ -408,7 +410,7 @@ export function DataTableViewOptions<TData>({
               type="button"
               data-testid="columns-reset"
               onClick={handleResetDefault}
-              className="text-slate-500 hover:text-telkom-navy font-medium cursor-pointer transition-colors px-1"
+              className="text-slate-500 hover:text-telkom-navy font-medium cursor-pointer transition-colors px-1 rounded-md"
               title="Reset columns and order to default"
             >
               Reset
@@ -425,12 +427,12 @@ export function DataTableViewOptions<TData>({
           {!searchQuery && mandatoryCols.length > 0 && (
             <div className="space-y-0.5 pb-1 mb-1 border-b border-slate-100">
               {mandatoryCols.map((column) => {
-                const label = getColumnDisplayTitle(column.id);
+                const label = getColumnDisplayTitle(column.id, isTrashView);
                 return (
                   <div
                     key={column.id}
                     data-testid={`column-mandatory-${column.id}`}
-                    className="flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-500 cursor-default select-none"
+                    className="flex items-center gap-2.5 px-2 py-1.5 rounded-md text-slate-500 cursor-default select-none"
                     title="Mandatory column (cannot be hidden or reordered)"
                   >
                     <Checkbox checked={true} disabled={true} />
@@ -448,7 +450,7 @@ export function DataTableViewOptions<TData>({
           {/* Reorderable Columns Section */}
           {filteredReorderableCols.length > 0 ? (
             filteredReorderableCols.map((column) => {
-              const label = getColumnDisplayTitle(column.id);
+              const label = getColumnDisplayTitle(column.id, isTrashView);
               const isChecked = isColVisible(column.id);
               const isDragging = draggedColId === column.id;
               const isOver = dragOverColId === column.id;
@@ -465,7 +467,7 @@ export function DataTableViewOptions<TData>({
                   onDragEnd={handleDragEnd}
                   onClick={() => handleRowClick(column)}
                   className={cn(
-                    "group relative flex items-center gap-2.5 px-2 py-1.5 rounded-lg text-slate-700 transition-all select-none cursor-pointer",
+                    "group relative flex items-center gap-2.5 px-2 py-1.5 rounded-md text-slate-700 transition-all select-none cursor-pointer",
                     "hover:bg-slate-100/80",
                     isDragging && "opacity-35 bg-slate-50",
                     !canDrag && "cursor-pointer"
@@ -493,7 +495,7 @@ export function DataTableViewOptions<TData>({
                     <span
                       title="Drag to reorder column"
                       onClick={(e) => e.stopPropagation()}
-                      className="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-slate-700 hover:bg-slate-200/50 rounded p-0.5 transition-colors leading-none cursor-grab active:cursor-grabbing select-none"
+                      className="material-symbols-outlined text-[18px] text-slate-400 group-hover:text-slate-700 hover:bg-slate-200/50 rounded-md p-0.5 transition-colors leading-none cursor-grab active:cursor-grabbing select-none"
                     >
                       drag_indicator
                     </span>
