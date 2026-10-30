@@ -32,6 +32,7 @@
 ### 6.5. Tab 2: Master Repository Table (Page)
 - [x] Atom: Status Badges (Red/Green/Yellow)
 - [x] Molecule: Table Pagination & Virtual Scrolling (@tanstack/react-virtual)
+- [x] Molecule: Universal Column Sorting Header (13 columns sortable: A-Z, dates, numbers, SLA)
 - [x] Organism: TanStack Table Core Implementation (38 columns)
 - [x] Organism: Client-Side Local Search & Filtering Integration
 - [x] Page: Final Assembly of `Repository.tsx`

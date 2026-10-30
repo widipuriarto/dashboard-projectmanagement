@@ -1,5 +1,10 @@
 import type { FilterCategory } from "@/types/project";
-import { formatMonthYearKey, idrCurrencyFormatter } from "./formatters";
+import type { FilterFn } from "@tanstack/react-table";
+import {
+  formatMonthYearKey,
+  idrCurrencyFormatter,
+  formatDateTime,
+} from "./formatters";
 
 export const MANDATORY_COLUMN_IDS = ["actions", "nomor", "project_id_pm"] as const;
 
@@ -12,6 +17,7 @@ export const OVERFLOW_ENABLED_COLUMN_IDS = [
   "idlop",
   "nomor_kl_sp_wo_nopes",
   "note_email_handover",
+  "jenis_layanan",
   "no_bast_telkom",
   "ket_update",
 ] as const;
@@ -204,41 +210,153 @@ export const sortProjectByIdPm = (
 
 /**
  * Custom global filter evaluator for multi-column and scoped column search.
+ * Supports all 38 enterprise columns including formatted dates, localized currencies,
+ * nested orders_data, boolean badges, and computed SLA durations.
  */
-export const customGlobalFilterFn = (
-  row: { getValue: (id: string) => unknown },
-  columnId: string,
-  filterValue: unknown
+export const customGlobalFilterFn: FilterFn<any> = (
+  row,
+  columnId,
+  filterValue
 ): boolean => {
   if (!filterValue) return true;
 
-  const query =
+  const query = (
     typeof filterValue === "string"
-      ? filterValue.toLowerCase().trim()
-      : (filterValue as { query?: string })?.query;
+      ? filterValue
+      : (filterValue as { query?: string })?.query || ""
+  )
+    .toLowerCase()
+    .trim();
+
   const targetCol =
     typeof filterValue === "string"
       ? "all"
-      : (filterValue as { targetColumn?: string })?.targetColumn;
+      : (filterValue as { targetColumn?: string })?.targetColumn || "all";
 
   if (!query) return true;
 
-  // If a specific target column is selected, only evaluate that column
-  if (targetCol && targetCol !== "all" && columnId !== targetCol) {
+  // If a specific target column is selected, only evaluate matching column identifiers
+  const isMatchingColumn =
+    targetCol === "all" ||
+    columnId === targetCol ||
+    (targetCol === "sla_bast" && columnId === "waktu_penyelesaian_bast") ||
+    (targetCol === "waktu_penyelesaian_bast" && columnId === "sla_bast");
+
+  if (!isMatchingColumn) {
     return false;
   }
 
   const rawVal = row.getValue(columnId);
-  if (rawVal == null) return false;
+  const original = (row.original || {}) as Record<string, unknown>;
 
-  // Standard case-insensitive string matching
-  const strVal = String(rawVal).toLowerCase();
-  if (strVal.includes(query)) return true;
+  // 1. Direct raw string/number matching
+  if (rawVal != null) {
+    const strVal = String(rawVal).toLowerCase();
+    if (strVal.includes(query)) return true;
+  }
 
-  // Special case: Rupiah formatted currency for nilai_kontrak_obl using singleton formatter
-  if (columnId === "nilai_kontrak_obl" && typeof rawVal === "number") {
-    const formatted = idrCurrencyFormatter.format(rawVal).toLowerCase();
-    if (formatted.includes(query)) return true;
+  // 2. Currency formatting for nilai_kontrak_obl
+  if (
+    columnId === "nilai_kontrak_obl" ||
+    (targetCol === "all" && typeof original.nilai_kontrak_obl === "number")
+  ) {
+    const val =
+      typeof original.nilai_kontrak_obl === "number"
+        ? original.nilai_kontrak_obl
+        : typeof rawVal === "number"
+        ? rawVal
+        : null;
+    if (val !== null) {
+      const formatted = idrCurrencyFormatter.format(val).toLowerCase();
+      if (formatted.includes(query)) return true;
+    }
+  }
+
+  // 3. Month-Year localized text representation for bulan_bc & komitmen_bc
+  if (columnId === "bulan_bc" || columnId === "komitmen_bc") {
+    const dateVal = rawVal as string | null | undefined;
+    if (dateVal) {
+      const formatted = formatMonthYearKey(dateVal).toLowerCase();
+      if (formatted.includes(query)) return true;
+    }
+  }
+
+  // 4. Hierarchical orders_data matching for no_order and sid
+  if (columnId === "no_order" || columnId === "sid") {
+    const ordersData = original.orders_data as Array<{
+      order_id?: string;
+      order_label?: string;
+      sids?: Array<{ sid?: string; sid_label?: string }>;
+    }> | undefined;
+
+    if (Array.isArray(ordersData)) {
+      for (const order of ordersData) {
+        if (columnId === "no_order") {
+          if (order.order_id && String(order.order_id).toLowerCase().includes(query)) {
+            return true;
+          }
+          if (order.order_label && String(order.order_label).toLowerCase().includes(query)) {
+            return true;
+          }
+        }
+        if (columnId === "sid" && Array.isArray(order.sids)) {
+          for (const s of order.sids) {
+            if (s.sid && String(s.sid).toLowerCase().includes(query)) {
+              return true;
+            }
+            if (s.sid_label && String(s.sid_label).toLowerCase().includes(query)) {
+              return true;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // 5. Computed SLA BAST elapsed days and compliance categories
+  if (columnId === "sla_bast" || columnId === "waktu_penyelesaian_bast") {
+    let diffDays: number | null = rawVal != null ? Number(rawVal) : null;
+    if (diffDays == null && original.tanggal_request_dr && original.tanggal_close_dr) {
+      const d1 = new Date(String(original.tanggal_request_dr));
+      const d2 = new Date(String(original.tanggal_close_dr));
+      if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+        diffDays = Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+      }
+    }
+    if (diffDays != null && !isNaN(diffDays)) {
+      if (String(diffDays).includes(query)) return true;
+      if (`${diffDays} hari`.includes(query)) return true;
+      const cat = getSlaCategory(diffDays).toLowerCase();
+      if (cat.includes(query)) return true;
+    }
+  }
+
+  // 6. Status Email Handover boolean and string representations
+  if (columnId === "status_email_handover") {
+    const isOk =
+      rawVal === true || rawVal === "OK" || String(rawVal).toLowerCase() === "true";
+    const isNok =
+      rawVal === false || rawVal === "NOK" || String(rawVal).toLowerCase() === "false";
+    if (isOk && (query === "ok" || query === "true")) return true;
+    if (isNok && (query === "nok" || query === "false")) return true;
+  }
+
+  // 7. Hardfile BAST boolean and string representations
+  if (columnId === "hardfile_bast") {
+    if (typeof rawVal === "boolean") {
+      if (rawVal && (query === "ok" || query === "ada" || query === "true")) return true;
+      if (!rawVal && (query === "nok" || query === "tidak ada" || query === "belum" || query === "false")) {
+        return true;
+      }
+    }
+  }
+
+  // 8. Formatted datetime matching for created_at & updated_at
+  if (columnId === "created_at" || columnId === "updated_at") {
+    if (typeof rawVal === "string") {
+      const formatted = formatDateTime(rawVal).toLowerCase();
+      if (formatted.includes(query)) return true;
+    }
   }
 
   return false;

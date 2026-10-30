@@ -136,7 +136,7 @@ export function mapInitialFormData(data?: ProjectPM | null): ProjectFormData {
     tanggal_request_dr: sanitizeDate(data.tanggal_request_dr),
     tanggal_close_dr: sanitizeDate(data.tanggal_close_dr),
     hardfile_bast: typeof data.hardfile_bast === "boolean"
-      ? (data.hardfile_bast ? "Ada" : "Belum Ada")
+      ? (data.hardfile_bast ? "OK" : "NOK")
       : String(data.hardfile_bast || ""),
     tanggal_bast: sanitizeDate(data.tanggal_bast),
     tahun_bast: data.tahun_bast != null ? Number(data.tahun_bast) : null,
@@ -237,8 +237,8 @@ export const STATUS_DOK_DELIVERY_OPTIONS: readonly string[] = [
   "05 Delivery NOK",
 ] as const;
 export const HARDFILE_BAST_OPTIONS: readonly string[] = [
-  "DONE",
-  "IN PROCESS",
+  "OK",
+  "NOK",
 ] as const;
 export const STATUS_ORDER_OPTIONS: readonly string[] = [
   "01 BC",

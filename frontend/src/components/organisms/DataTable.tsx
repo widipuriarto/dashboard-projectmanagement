@@ -43,6 +43,7 @@ import {
   STORAGE_KEY_FILTERS,
   STORAGE_KEY_SORTING,
   customGlobalFilterFn,
+  getColumnDisplayTitle,
 } from "@/lib/table-constants";
 import type { ProjectPM } from "@/types/project";
 
@@ -62,7 +63,10 @@ interface DataTableProps<TData, TValue> {
   onRestore?: (row: TData) => void;
   onPermanentDelete?: (row: TData) => void;
   onTrashClick?: () => void;
-  onExportExcel?: () => void;
+  onExportExcel?: (
+    rows: TData[],
+    visibleColumns: Array<{ key: string; header: string }>
+  ) => void;
   onExportPdf?: () => void;
 }
 
@@ -215,6 +219,7 @@ export function DataTable<TData, TValue>({
     },
     meta,
     globalFilterFn: customGlobalFilterFn,
+    getColumnCanGlobalFilter: (column) => column.id !== "actions" && column.id !== "nomor",
     getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
       setSorting((prev) => {
@@ -510,6 +515,19 @@ export function DataTable<TData, TValue>({
     ? totalSize - virtualRows[virtualRows.length - 1].end
     : 0;
 
+  const handleExportExcelClick = React.useCallback(() => {
+    const displayedRows = table.getRowModel().rows.map((r) => r.original);
+    const visibleColumns = table
+      .getVisibleLeafColumns()
+      .filter((col) => col.id !== "actions")
+      .map((col) => ({
+        key: col.id,
+        header: getColumnDisplayTitle(col.id, isTrashMode),
+      }));
+
+    onExportExcel?.(displayedRows, visibleColumns);
+  }, [table, isTrashMode, onExportExcel]);
+
   return (
     <div className="space-y-4 flex flex-col flex-1 min-h-0">
       {/* Responsive Table Toolbar */}
@@ -533,7 +551,7 @@ export function DataTable<TData, TValue>({
             <DataTableExport
               className="w-full px-1 sm:px-2"
               disabled={isFormActive || isTrashMode}
-              onExportExcel={onExportExcel}
+              onExportExcel={handleExportExcelClick}
               onExportPdf={onExportPdf}
             />
           </div>
@@ -591,7 +609,7 @@ export function DataTable<TData, TValue>({
             <DataTableViewOptions table={table} disabled={isFormActive} />
             <DataTableExport
               disabled={isFormActive || isTrashMode}
-              onExportExcel={onExportExcel}
+              onExportExcel={handleExportExcelClick}
               onExportPdf={onExportPdf}
             />
             <Button

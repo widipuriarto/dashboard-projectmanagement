@@ -5,6 +5,13 @@ import { Edit, Trash2 } from "lucide-react";
 import { MicrosoftTeamsIcon } from "@/components/atoms/MicrosoftTeamsIcon";
 import { OrderSidExpandButton } from "@/components/atoms/OrderSidExpandButton";
 import { ProjectIdSortHeader } from "@/components/molecules/ProjectIdSortHeader";
+import { DataTableSortHeader } from "@/components/molecules/DataTableSortHeader";
+import {
+  textSortFn,
+  dateSortFn,
+  numericSortFn,
+  slaBastSortFn,
+} from "@/lib/sortingFns";
 import { cn } from "@/lib/utils";
 import { normalizeOrdersData, flattenOrderSidPairs } from "@/lib/orderParser";
 import {
@@ -169,44 +176,86 @@ export const columns: ColumnDef<ProjectPM>[] = [
     sortingFn: sortProjectByIdPm,
     header: ({ column }) => <ProjectIdSortHeader column={column} />,
     cell: ({ row }) => <div className="text-center font-mono font-medium">{row.getValue("project_id_pm") || "-"}</div>,
-    size: 200,
-    minSize: 175,
+    size: 260,
+    minSize: 230,
   },
   {
     accessorKey: "segment",
     filterFn: multiSelectFilterFn,
     header: () => <div className="text-center">SEGMENT</div>,
-    cell: ({ row }) => <div className="text-center">{row.getValue("segment") || "-"}</div>,
-    size: 100,
+    cell: ({ row }) => {
+      const val = (row.getValue("segment") as string) || "-";
+      return (
+        <div className="flex justify-center">
+          {val !== "-" ? <StatusBadge variant="default">{val}</StatusBadge> : <span className="text-slate-400">-</span>}
+        </div>
+      );
+    },
+    size: 110,
+    minSize: 90,
   },
   {
     accessorKey: "witel",
     filterFn: multiSelectFilterFn,
     header: () => <div className="text-center">WITEL</div>,
-    cell: ({ row }) => <div className="text-left">{row.getValue("witel") || "-"}</div>,
-    size: 180,
+    cell: ({ row }) => {
+      const val = (row.getValue("witel") as string) || "-";
+      return (
+        <div className="flex justify-center">
+          {val !== "-" ? <StatusBadge variant="default">{val}</StatusBadge> : <span className="text-slate-400">-</span>}
+        </div>
+      );
+    },
+    size: 190,
     minSize: 160,
   },
   {
     accessorKey: "nama_proyek",
-    header: "Nama Proyek",
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Nama Proyek"
+        align="left"
+        sortType="alpha"
+      />
+    ),
+    sortingFn: textSortFn,
     size: 550,
+    minSize: 300,
   },
   {
     accessorKey: "nama_mitra",
-    header: "Nama Mitra",
-    size: 250,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Nama Mitra"
+        align="left"
+        sortType="alpha"
+      />
+    ),
+    sortingFn: textSortFn,
+    size: 260,
+    minSize: 200,
   },
   {
     accessorKey: "nama_pelanggan",
-    header: "Nama Pelanggan",
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Nama Pelanggan"
+        align="left"
+        sortType="alpha"
+      />
+    ),
+    sortingFn: textSortFn,
     size: 350,
-},
-{
-  accessorKey: "idlop",
-  header: "IDLOP",
-  size: 200,
-},
+    minSize: 220,
+  },
+  {
+    accessorKey: "idlop",
+    header: "IDLOP",
+    size: 200,
+  },
   {
     accessorKey: "jenis_kontrak",
     filterFn: multiSelectFilterFn,
@@ -228,21 +277,48 @@ export const columns: ColumnDef<ProjectPM>[] = [
   },
   {
     accessorKey: "tgl_kontrak",
-    header: () => <div className="text-center">Tgl Kontrak</div>,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Tgl Kontrak"
+        align="center"
+        sortType="date"
+      />
+    ),
+    sortingFn: dateSortFn,
     cell: ({ row }) => <div className="text-center">{row.getValue("tgl_kontrak") || "-"}</div>,
-    size: 150,
+    size: 215,
+    minSize: 190,
   },
   {
     accessorKey: "tahun_kontrak",
     filterFn: multiSelectFilterFn,
-    header: () => <div className="text-center">Tahun Kontrak</div>,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Tahun Kontrak"
+        align="center"
+        sortType="number"
+      />
+    ),
+    sortingFn: numericSortFn,
     cell: ({ row }) => <div className="text-center">{row.getValue("tahun_kontrak") || "-"}</div>,
-    size: 150,
+    size: 235,
+    minSize: 205,
   },
   {
     accessorKey: "nilai_kontrak_obl",
-    header: () => <div className="text-center">Nilai Kontrak OBL</div>,
-    size: 180,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Nilai Kontrak OBL"
+        align="center"
+        sortType="number"
+      />
+    ),
+    sortingFn: numericSortFn,
+    size: 265,
+    minSize: 235,
     cell: ({ row }) => {
       const val = row.getValue("nilai_kontrak_obl") as number;
       return (
@@ -470,7 +546,7 @@ export const columns: ColumnDef<ProjectPM>[] = [
   {
     accessorKey: "jenis_layanan",
     header: "JENIS LAYANAN",
-    size: 150,
+    size: 300,
   },
   {
     accessorKey: "status_delivery_project",
@@ -494,8 +570,15 @@ export const columns: ColumnDef<ProjectPM>[] = [
   {
     accessorKey: "jenis_dok_delivery",
     header: () => <div className="text-center">JENIS DOK DELIVERY</div>,
-    cell: ({ row }) => <div className="text-center">{row.getValue("jenis_dok_delivery") || "-"}</div>,
-    size: 200,
+    cell: ({ row }) => {
+      const val = (row.getValue("jenis_dok_delivery") as string) || "-";
+      return (
+        <div className="flex justify-center">
+          {val !== "-" ? <StatusBadge variant="default">{val}</StatusBadge> : <span className="text-slate-400">-</span>}
+        </div>
+      );
+    },
+    size: 190,
   },
   {
     accessorKey: "status_dokumen_delivery",
@@ -522,33 +605,69 @@ export const columns: ColumnDef<ProjectPM>[] = [
   },
   {
     accessorKey: "tanggal_request_dr",
-    header: () => <div className="text-center">Tanggal Request DR</div>,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Tanggal Request DR"
+        align="center"
+        sortType="date"
+      />
+    ),
+    sortingFn: dateSortFn,
     cell: ({ row }) => <div className="text-center">{row.getValue("tanggal_request_dr") || "-"}</div>,
-    size: 200,
+    size: 275,
+    minSize: 245,
   },
   {
     accessorKey: "tanggal_close_dr",
-    header: () => <div className="text-center">Tanggal Close DR</div>,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Tanggal Close DR"
+        align="center"
+        sortType="date"
+      />
+    ),
+    sortingFn: dateSortFn,
     cell: ({ row }) => <div className="text-center">{row.getValue("tanggal_close_dr") || "-"}</div>,
-    size: 150,
+    size: 265,
+    minSize: 235,
   },
   {
     accessorKey: "no_bast_telkom",
     header: "No BAST Telkom",
-    size: 300,
+    size: 350,
   },
   {
     accessorKey: "tanggal_bast",
-    header: () => <div className="text-center">Tanggal BAST</div>,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Tanggal BAST"
+        align="center"
+        sortType="date"
+      />
+    ),
+    sortingFn: dateSortFn,
     cell: ({ row }) => <div className="text-center">{row.getValue("tanggal_bast") || "-"}</div>,
-    size: 140,
+    size: 230,
+    minSize: 200,
   },
   {
     accessorKey: "tahun_bast",
     filterFn: multiSelectFilterFn,
-    header: () => <div className="text-center">Tahun BAST</div>,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Tahun BAST"
+        align="center"
+        sortType="number"
+      />
+    ),
+    sortingFn: numericSortFn,
     cell: ({ row }) => <div className="text-center">{row.getValue("tahun_bast") || "-"}</div>,
-    size: 140,
+    size: 220,
+    minSize: 190,
   },
   {
     accessorKey: "pm",
@@ -568,8 +687,17 @@ export const columns: ColumnDef<ProjectPM>[] = [
     id: "sla_bast",
     accessorKey: "waktu_penyelesaian_bast",
     filterFn: slaBastFilterFn,
-    header: () => <div className="text-center">Waktu Penyelesaian BAST</div>,
-    size: 220,
+    sortingFn: slaBastSortFn,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Waktu Penyelesaian BAST"
+        align="center"
+        sortType="number"
+      />
+    ),
+    size: 325,
+    minSize: 285,
     cell: ({ row }) => {
       const dbVal = row.getValue("waktu_penyelesaian_bast");
       let diffDays: number | null = dbVal != null ? Number(dbVal) : null;
@@ -634,15 +762,33 @@ export const columns: ColumnDef<ProjectPM>[] = [
   {
     accessorKey: "komitmen_bc",
     filterFn: monthYearFilterFn,
-    header: () => <div className="text-center">KOMITMEN BC</div>,
-    size: 160,
+    sortingFn: dateSortFn,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="KOMITMEN BC"
+        align="center"
+        sortType="date"
+      />
+    ),
+    size: 240,
+    minSize: 210,
     cell: ({ row }) => <div className="text-center">{formatMonthYear(row.getValue("komitmen_bc"))}</div>,
   },
   {
     accessorKey: "bulan_bc",
     filterFn: monthYearFilterFn,
-    header: () => <div className="text-center">Bulan BC</div>,
-    size: 160,
+    sortingFn: dateSortFn,
+    header: ({ column }) => (
+      <DataTableSortHeader
+        column={column}
+        title="Bulan BC"
+        align="center"
+        sortType="date"
+      />
+    ),
+    size: 205,
+    minSize: 175,
     cell: ({ row }) => <div className="text-center">{formatMonthYear(row.getValue("bulan_bc"))}</div>,
   },
   {

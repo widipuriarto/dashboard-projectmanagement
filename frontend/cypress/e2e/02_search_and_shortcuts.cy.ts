@@ -112,4 +112,44 @@ describe("Skenario 2: Search Input, Scoped Column & Keyboard Shortcut", () => {
     // 5. Tabel kembali menampilkan daftar baris data awal
     cy.get('[data-testid="table-row"]').should("have.length.at.least", 1);
   });
+
+  it("Test 2.5: harus mendukung scoped search pada kolom jenis_kontrak, jenis_layanan, dan id_digireview", () => {
+    const searchInput = '[data-testid="search-input"]';
+    const columnDropdown = '[data-testid="search-column-dropdown"]';
+
+    // 1. Uji scoped search pada kolom 'Jenis Kontrak'
+    cy.get(columnDropdown).click();
+    cy.get('[data-testid="search-column-jenis_kontrak"]').click();
+    cy.get(searchInput).invoke("attr", "placeholder").should("include", "Jenis Kontrak");
+    cy.get(searchInput).clear().type("KL");
+    cy.get('[data-testid="table-row"]').should("have.length.at.least", 1);
+    cy.get('[data-testid="table-row"]').each(($row) => {
+      cy.wrap($row).invoke("text").should("match", /KL/i);
+    });
+
+    // 2. Uji scoped search pada kolom 'Jenis Layanan'
+    cy.get(columnDropdown).click();
+    cy.get('[data-testid="search-column-jenis_layanan"]').click();
+    cy.get(searchInput).invoke("attr", "placeholder").should("include", "Jenis Layanan");
+    cy.get(searchInput).clear().type("Jaringan");
+    cy.get('[data-testid="table-row"]').should("have.length.at.least", 1);
+    cy.get('[data-testid="table-row"]').each(($row) => {
+      cy.wrap($row).invoke("text").should("match", /Jaringan/i);
+    });
+
+    // 3. Uji scoped search pada kolom 'ID Digireview'
+    cy.get(columnDropdown).click();
+    cy.get('[data-testid="search-column-id_digireview"]').click();
+    cy.get(searchInput).invoke("attr", "placeholder").should("include", "Digireview");
+    cy.get(searchInput).clear().type("103878");
+    cy.get('[data-testid="table-row"]').should("have.length.at.least", 1);
+    cy.get('[data-testid="table-row"]').each(($row) => {
+      cy.wrap($row).invoke("text").should("include", "103878");
+    });
+
+    // 4. Reset kembali ke All Columns
+    cy.get(columnDropdown).click();
+    cy.get('[data-testid="search-column-all"]').click();
+    cy.get(searchInput).clear();
+  });
 });

@@ -1,11 +1,23 @@
 import ExcelJS from "exceljs";
 import { normalizeOrdersData, flattenOrderSidPairs } from "./orderParser";
+import { formatMonthYearKey, formatDateTime } from "./formatters";
 import type { ProjectPM } from "@/types/project";
 
 export type { ProjectPM };
 
+export interface ExportColumnDef {
+  key: string;
+  header: string;
+}
+
+export interface ExportProjectsOptions {
+  columns?: ExportColumnDef[];
+  filename?: string;
+  isTrashView?: boolean;
+}
+
 /**
- * Standard column titles for CSV / Excel exports.
+ * Standard column titles for CSV / Excel exports fallback.
  */
 export const EXPORT_COLUMN_HEADERS: Record<string, string> = {
   nomor: "No.",
@@ -38,6 +50,7 @@ export const EXPORT_COLUMN_HEADERS: Record<string, string> = {
   no_bast_telkom: "No BAST Telkom",
   tanggal_bast: "Tanggal BAST",
   tahun_bast: "Tahun BAST",
+  sla_bast: "Waktu Penyelesaian BAST",
   waktu_penyelesaian_bast: "Waktu Penyelesaian BAST",
   status_order: "Status Order",
   status_gr: "Status GR",
@@ -46,10 +59,13 @@ export const EXPORT_COLUMN_HEADERS: Record<string, string> = {
   ket_update: "Ket Update",
   file_bast: "File BAST",
   file_bapl: "File BAPL",
+  hardfile_bast: "Hardfile BAST",
+  created_at: "Created At",
+  updated_at: "Updated At",
 };
 
 /**
- * Ordered column keys to export (excluding UI-only action column).
+ * Ordered fallback column keys to export (excluding UI-only action column).
  */
 export const EXPORT_COLUMN_KEYS = Object.keys(EXPORT_COLUMN_HEADERS);
 
@@ -69,17 +85,22 @@ const CENTER_ALIGNED_KEYS = new Set([
   "no_order",
   "sid",
   "status_delivery_project",
+  "jenis_dok_delivery",
   "status_dokumen_delivery",
   "id_digireview",
   "tanggal_request_dr",
   "tanggal_close_dr",
   "tanggal_bast",
   "tahun_bast",
+  "sla_bast",
   "waktu_penyelesaian_bast",
   "status_order",
   "status_gr",
   "bulan_bc",
   "komitmen_bc",
+  "hardfile_bast",
+  "created_at",
+  "updated_at",
 ]);
 
 // Telkom enterprise styling palette
@@ -98,14 +119,28 @@ const CELL_BORDER: Partial<ExcelJS.Borders> = {
 /**
  * Performs Tabular Row Duplication on project rows:
  * For multi-Order / multi-SID projects, each (Order ID, SID) pair gets its own row
- * while duplicating all parent project metadata identically.
+ * when Order/SID columns are visible. If neither is visible, duplication is skipped.
  */
-export function buildDenormalizedExportRows(projects: ProjectPM[]): Array<Record<string, unknown>> {
+export function buildDenormalizedExportRows(
+  projects: ProjectPM[],
+  activeKeys?: string[]
+): Array<Record<string, unknown>> {
   const flattenedRows: Array<Record<string, unknown>> = [];
+  const shouldDuplicatePairs = activeKeys
+    ? activeKeys.includes("no_order") || activeKeys.includes("sid")
+    : true;
 
   let exportSeq = 1;
 
   for (const project of projects) {
+    if (!shouldDuplicatePairs) {
+      flattenedRows.push({
+        ...project,
+        nomor: exportSeq++,
+      });
+      continue;
+    }
+
     const pairs = flattenOrderSidPairs(normalizeOrdersData(project));
 
     if (pairs.length === 0) {
@@ -146,7 +181,11 @@ export function buildDenormalizedExportRows(projects: ProjectPM[]): Array<Record
 /**
  * Applies corporate styling, header design, borders, and number formats to worksheet.
  */
-function applyWorksheetStyles(worksheet: ExcelJS.Worksheet, totalRows: number): void {
+function applyWorksheetStyles(
+  worksheet: ExcelJS.Worksheet,
+  totalRows: number,
+  activeColumns: ExportColumnDef[]
+): void {
   // 1. Freeze top header row
   worksheet.views = [{ state: "frozen", ySplit: 1, activeCell: "A2" }];
 
@@ -181,7 +220,8 @@ function applyWorksheetStyles(worksheet: ExcelJS.Worksheet, totalRows: number): 
     const isZebra = rowIdx % 2 === 1;
 
     row.eachCell({ includeEmpty: true }, (cell, colNumber) => {
-      const colKey = EXPORT_COLUMN_KEYS[colNumber - 1];
+      const colDef = activeColumns[colNumber - 1];
+      const colKey = colDef ? colDef.key : "";
 
       cell.font = {
         name: "Arial",
@@ -203,6 +243,11 @@ function applyWorksheetStyles(worksheet: ExcelJS.Worksheet, totalRows: number): 
       if (colKey === "nilai_kontrak_obl") {
         cell.alignment = { vertical: "middle", horizontal: "right" };
         cell.numFmt = '"Rp"#,##0;("Rp"#,##0);"-"';
+      } else if (colKey === "sla_bast" || colKey === "waktu_penyelesaian_bast") {
+        cell.alignment = { vertical: "middle", horizontal: "center" };
+        if (typeof cell.value === "number") {
+          cell.numFmt = '0" Hari"';
+        }
       } else if (CENTER_ALIGNED_KEYS.has(colKey)) {
         cell.alignment = { vertical: "middle", horizontal: "center" };
       } else {
@@ -213,11 +258,16 @@ function applyWorksheetStyles(worksheet: ExcelJS.Worksheet, totalRows: number): 
 }
 
 /**
- * Calculates and applies dynamic auto-fit column widths with padding.
+ * Calculates and applies dynamic auto-fit column widths with safe padding boundaries.
  */
-function autoFitColumnWidths(worksheet: ExcelJS.Worksheet, rows: Array<Record<string, unknown>>): void {
-  EXPORT_COLUMN_KEYS.forEach((key, idx) => {
-    const headerTitle = EXPORT_COLUMN_HEADERS[key] || key;
+function autoFitColumnWidths(
+  worksheet: ExcelJS.Worksheet,
+  rows: Array<Record<string, unknown>>,
+  activeColumns: ExportColumnDef[]
+): void {
+  activeColumns.forEach((colDef, idx) => {
+    const key = colDef.key;
+    const headerTitle = colDef.header || key;
     let maxLen = headerTitle.length;
 
     for (const row of rows) {
@@ -240,15 +290,26 @@ function autoFitColumnWidths(worksheet: ExcelJS.Worksheet, rows: Array<Record<st
 
 /**
  * Exports project records to authentic Microsoft Excel (.xlsx) format
- * complete with corporate styling, proper number formatting, and Tabular Row Duplication.
+ * matching the current table view (visible columns, column ordering, filters, search, and sorting).
  */
 export async function exportProjectsToExcel(
   projects: ProjectPM[],
-  filename?: string
+  options?: ExportProjectsOptions
 ): Promise<void> {
-  const denormalizedRows = buildDenormalizedExportRows(projects);
+  const activeColumns: ExportColumnDef[] =
+    options?.columns && options.columns.length > 0
+      ? options.columns
+      : EXPORT_COLUMN_KEYS.map((key) => ({
+          key,
+          header: EXPORT_COLUMN_HEADERS[key] || key,
+        }));
+
+  const activeKeys = activeColumns.map((c) => c.key);
+  const denormalizedRows = buildDenormalizedExportRows(projects, activeKeys);
+
   const defaultFilename =
-    filename || `Projects_PM_Export_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    options?.filename ||
+    `Projects_PM_Export_${new Date().toISOString().slice(0, 10)}.xlsx`;
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = "Telkom RSO Area 1";
@@ -256,39 +317,81 @@ export async function exportProjectsToExcel(
   workbook.created = new Date();
   workbook.modified = new Date();
 
-  const worksheet = workbook.addWorksheet("Master Repository");
+  const worksheet = workbook.addWorksheet(
+    options?.isTrashView ? "Trash Projects" : "Master Repository"
+  );
 
-  // 1. Set column definitions
-  worksheet.columns = EXPORT_COLUMN_KEYS.map((key) => ({
-    header: EXPORT_COLUMN_HEADERS[key] || key,
-    key: key,
+  // 1. Set column definitions matching active visible columns
+  worksheet.columns = activeColumns.map((col) => ({
+    header: col.header,
+    key: col.key,
   }));
 
   // 2. Add data rows
   for (const item of denormalizedRows) {
     const rowObj: Record<string, unknown> = {};
-    for (const key of EXPORT_COLUMN_KEYS) {
+    for (const col of activeColumns) {
+      const key = col.key;
       let val = item[key];
 
-      if (key === "status_email_handover") {
-        if (val === true) val = "OK";
-        else if (val === false) val = "NOK";
+      // Handle accessorKey fallback for sla_bast
+      if (val === undefined && key === "sla_bast") {
+        val = item["waktu_penyelesaian_bast"];
       }
 
+      // Compute SLA difference dynamically if not pre-calculated
+      if ((key === "sla_bast" || key === "waktu_penyelesaian_bast") && val == null) {
+        if (item.tanggal_request_dr && item.tanggal_close_dr) {
+          const d1 = new Date(String(item.tanggal_request_dr));
+          const d2 = new Date(String(item.tanggal_close_dr));
+          if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+            val = Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+          }
+        }
+      }
+
+      // Normalize boolean/status values for status_email_handover
+      if (key === "status_email_handover") {
+        if (val === true || String(val).toLowerCase() === "true") val = "OK";
+        else if (val === false || String(val).toLowerCase() === "false") val = "NOK";
+      }
+
+      // Normalize boolean/status values for hardfile_bast
+      if (key === "hardfile_bast") {
+        if (val === true || String(val).toLowerCase() === "true") val = "ADA";
+        else if (val === false || String(val).toLowerCase() === "false") val = "TIDAK ADA";
+      }
+
+      // Numeric parsing for contract value
       if (key === "nilai_kontrak_obl") {
         const num = typeof val === "number" ? val : parseFloat(String(val));
         val = !isNaN(num) ? num : null;
       }
 
+      // Clean date values to YYYY-MM-DD
       if (
         (key === "tgl_kontrak" ||
           key === "tanggal_request_dr" ||
           key === "tanggal_close_dr" ||
-          key === "tanggal_bast" ||
-          key === "komitmen_bc") &&
+          key === "tanggal_bast") &&
         val
       ) {
         val = String(val).split("T")[0];
+      }
+
+      // Month-Year localized representation
+      if ((key === "bulan_bc" || key === "komitmen_bc") && val) {
+        val = formatMonthYearKey(String(val));
+      }
+
+      // Datetime formatting for created_at and updated_at
+      if ((key === "created_at" || key === "updated_at") && val) {
+        val = formatDateTime(String(val));
+      }
+
+      // In trash view, map updated_at to deleted_at timestamp
+      if (key === "updated_at" && options?.isTrashView) {
+        val = item.deleted_at ? formatDateTime(String(item.deleted_at)) : val;
       }
 
       rowObj[key] = val != null ? val : "";
@@ -296,9 +399,9 @@ export async function exportProjectsToExcel(
     worksheet.addRow(rowObj);
   }
 
-  // 3. Apply navy color styling and dynamic column widths
-  applyWorksheetStyles(worksheet, denormalizedRows.length);
-  autoFitColumnWidths(worksheet, denormalizedRows);
+  // 3. Apply corporate styles and dynamic column auto-fit
+  applyWorksheetStyles(worksheet, denormalizedRows.length, activeColumns);
+  autoFitColumnWidths(worksheet, denormalizedRows, activeColumns);
 
   // 4. Generate binary buffer and trigger browser download
   const buffer = await workbook.xlsx.writeBuffer();

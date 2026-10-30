@@ -17,7 +17,7 @@ export function UnsavedChangesModal({
     <div
       role="dialog"
       aria-modal="true"
-      className="absolute inset-x-0 bottom-0 top-14 z-20 flex items-center justify-center bg-slate-900/35 backdrop-blur-[1px] p-4 animate-in fade-in duration-200"
+      className="absolute inset-x-0 bottom-0 top-11 z-20 flex items-center justify-center bg-slate-900/35 backdrop-blur-[1px] p-4 animate-in fade-in duration-200"
     >
       <div
         data-testid="unsaved-changes-modal"

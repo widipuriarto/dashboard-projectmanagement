@@ -50,16 +50,12 @@ export function CustomSelect({
       return opt;
     });
 
-    if (value && !mapped.some((o) => o.value === value)) {
-      mapped.push({ value, label: value });
-    }
-
     if (allowClear && !mapped.some((o) => o.value === "")) {
       return [{ value: "", label: placeholder }, ...mapped];
     }
 
     return mapped;
-  }, [options, allowClear, placeholder, value]);
+  }, [options, allowClear, placeholder]);
 
   const selectedOption = React.useMemo(() => {
     if (!value) return null;

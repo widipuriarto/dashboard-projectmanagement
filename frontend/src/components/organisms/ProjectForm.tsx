@@ -11,6 +11,10 @@ import type { OrdersData } from "@/types/orders";
 import type { ProjectPM } from "@/types/project";
 import { useProjectSequence } from "@/hooks/useProjectSequence";
 import {
+  formatProjectIdPm,
+  allocateNextProjectCredentials,
+} from "@/lib/projectSequence";
+import {
   type ProjectFormData,
   mapInitialFormData,
   getPmBySegment,
@@ -19,6 +23,7 @@ import {
   ProjectFormDelivery,
   ProjectFormBast,
   ProjectFormStatus,
+  YearMismatchModal,
 } from "@/components/molecules/project-form";
 
 export type { ProjectFormData };
@@ -52,6 +57,12 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
     const [isSubmitting, setIsSubmitting] = React.useState(false);
     const [hasSubmitAttempted, setHasSubmitAttempted] = React.useState(false);
     const [isDiscardModalOpen, setIsDiscardModalOpen] = React.useState(false);
+    const [isYearMismatchModalOpen, setIsYearMismatchModalOpen] = React.useState(false);
+    const [mismatchYears, setMismatchYears] = React.useState<{
+      fromYear: number;
+      toYear: number;
+      syncToDateYear?: boolean;
+    } | null>(null);
     const { registerGuard } = useNavigationGuard();
     const { showToast } = useToast();
     const pendingDiscardActionRef = React.useRef<(() => void) | null>(null);
@@ -63,7 +74,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
       setHasSubmitAttempted(false);
     }, [initialData]);
 
-    const { generatedProjectId, allocateCredentials } = useProjectSequence({
+    const { generatedProjectId, activeProjectSeq, allocateCredentials } = useProjectSequence({
       existingProjects,
       initialData,
       isEditMode,
@@ -129,6 +140,14 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         if (key === "segment") {
           next.pm = getPmBySegment(value as string);
         }
+        // Auto-sync contract year when contract date is entered or changed
+        if (key === "tgl_kontrak" && typeof value === "string" && value) {
+          const parts = value.split("-");
+          const extractedYear = parseInt(parts[0], 10);
+          if (!isNaN(extractedYear) && extractedYear > 1900) {
+            next.tahun_kontrak = extractedYear;
+          }
+        }
         // Keep string representations in sync with structured orders_data
         if (key === "orders_data") {
           const serialized = serializeOrdersData(value as OrdersData);
@@ -137,10 +156,13 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         }
         return next;
       });
-      if (errors[key]) {
+      if (errors[key] || (key === "tgl_kontrak" && errors.tahun_kontrak)) {
         setErrors((prev) => {
           const next = { ...prev };
           delete next[key];
+          if (key === "tgl_kontrak") {
+            delete next.tahun_kontrak;
+          }
           return next;
         });
       }
@@ -210,22 +232,60 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
     return Object.keys(errs).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setHasSubmitAttempted(true);
-    if (!validateForm()) {
-      return;
+  const checkYearMismatch = (): {
+    fromYear: number;
+    toYear: number;
+    syncToDateYear?: boolean;
+  } | null => {
+    const currentFormYear = formData.tahun_kontrak;
+    const parts = formData.tgl_kontrak ? formData.tgl_kontrak.split("-") : [];
+    const tglYear = parts.length > 0 ? parseInt(parts[0], 10) : null;
+    const validTglYear = tglYear && !isNaN(tglYear) && tglYear > 1900 ? tglYear : null;
+
+    // Check 1: In Edit Mode, contract year changed from the original database value
+    if (isEditMode && initialData?.tahun_kontrak != null) {
+      const origYear = Number(initialData.tahun_kontrak);
+      if (currentFormYear && currentFormYear !== origYear) {
+        return {
+          fromYear: origYear,
+          toYear: currentFormYear,
+        };
+      }
     }
 
+    // Check 2: Discrepancy between contract date year and contract year input
+    if (validTglYear && currentFormYear && validTglYear !== currentFormYear) {
+      return {
+        fromYear: currentFormYear,
+        toYear: validTglYear,
+        syncToDateYear: true,
+      };
+    }
+
+    return null;
+  };
+
+  const executeSaveProject = async (overrideYear?: number) => {
     setIsSubmitting(true);
 
     try {
+      const finalTahunKontrak = overrideYear ?? formData.tahun_kontrak;
+      const serializedOrders = serializeOrdersData(formData.orders_data);
+
       if (isEditMode && initialData) {
-        const serializedOrders = serializeOrdersData(formData.orders_data);
+        const finalProjectId = overrideYear
+          ? formatProjectIdPm(
+              finalTahunKontrak,
+              formData.witel,
+              formData.segment,
+              activeProjectSeq
+            )
+          : generatedProjectId;
+
         // Construct sanitized payload for Supabase UPDATE
         const payload: Record<string, unknown> = {
-          project_id_pm: generatedProjectId,
-          tahun_kontrak: formData.tahun_kontrak,
+          project_id_pm: finalProjectId,
+          tahun_kontrak: finalTahunKontrak,
           witel: formData.witel,
           segment: formData.segment,
           nama_proyek: formData.nama_proyek.trim(),
@@ -290,7 +350,7 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         showToast({
           type: "success",
           title: "Project Successfully Updated",
-          description: `${formData.nama_proyek || generatedProjectId} has been updated.`,
+          description: `${formData.nama_proyek || finalProjectId} has been updated.`,
           duration: 5000,
         });
 
@@ -302,16 +362,22 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         return;
       }
 
-      // Allocate next credentials using encapsulated sequence allocator
-      const { finalProjectId, nextNomor } = await allocateCredentials();
+      // Allocate next credentials using encapsulated sequence allocator or target year
+      const { finalProjectId, nextNomor } = overrideYear
+        ? await allocateNextProjectCredentials(
+            existingProjects,
+            formData.witel,
+            formData.segment,
+            finalTahunKontrak
+          )
+        : await allocateCredentials();
 
       // Construct sanitized payload for Supabase projects table
       // Note: waktu_penyelesaian_bast is generated automatically by PostgreSQL
-      const serializedOrders = serializeOrdersData(formData.orders_data);
       const payload: Record<string, unknown> = {
         nomor: nextNomor,
         project_id_pm: finalProjectId,
-        tahun_kontrak: formData.tahun_kontrak,
+        tahun_kontrak: finalTahunKontrak,
         witel: formData.witel,
         segment: formData.segment,
         nama_proyek: formData.nama_proyek.trim(),
@@ -389,6 +455,38 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
     }
   };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setHasSubmitAttempted(true);
+    if (!validateForm()) {
+      return;
+    }
+
+    // Check if there is a contract year mismatch between date and input
+    const mismatch = checkYearMismatch();
+    if (mismatch) {
+      setMismatchYears(mismatch);
+      setIsYearMismatchModalOpen(true);
+      return;
+    }
+
+    await executeSaveProject();
+  };
+
+  const handleConfirmMismatchModal = async () => {
+    if (!mismatchYears) return;
+    const targetYear = mismatchYears.toYear;
+    setIsYearMismatchModalOpen(false);
+    if (mismatchYears.syncToDateYear) {
+      setFormData((prev) => ({ ...prev, tahun_kontrak: targetYear }));
+    }
+    await executeSaveProject(targetYear);
+  };
+
+  const handleCancelMismatchModal = () => {
+    setIsYearMismatchModalOpen(false);
+  };
+
   return (
     <div className="relative flex flex-col h-full w-full bg-white rounded-md overflow-hidden isolate">
       {/* Centered In-Container Discard Confirmation Modal */}
@@ -410,11 +508,23 @@ export const ProjectForm = React.forwardRef<ProjectFormHandle, ProjectFormProps>
         }}
       />
 
+      {/* Year Mismatch Confirmation Modal */}
+      {mismatchYears && (
+        <YearMismatchModal
+          isOpen={isYearMismatchModalOpen}
+          fromYear={mismatchYears.fromYear}
+          toYear={mismatchYears.toYear}
+          isSubmitting={isSubmitting}
+          onCancel={handleCancelMismatchModal}
+          onConfirm={handleConfirmMismatchModal}
+        />
+      )}
+
       {/* Sticky Header styled to match Repository Table Header */}
       <div
         className={cn(
           "flex items-center justify-between h-11 px-4 sm:px-6 border-b border-slate-300/80 bg-[#DFE6F0] sticky top-0 z-30 select-none rounded-t-md",
-          isDiscardModalOpen && "pointer-events-none"
+          (isDiscardModalOpen || isYearMismatchModalOpen) && "pointer-events-none"
         )}
       >
         <div className="flex items-center gap-1.5 sm:gap-2">

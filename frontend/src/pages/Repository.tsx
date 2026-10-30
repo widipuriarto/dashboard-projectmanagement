@@ -389,18 +389,25 @@ export default function Repository() {
     setSearchParams({});
   };
 
-  const handleExportExcel = async () => {
-    if (activeProjects.length === 0) {
+  const handleExportExcel = async (
+    displayedRows?: ProjectPM[],
+    visibleColumns?: Array<{ key: string; header: string }>
+  ) => {
+    const rowsToExport = displayedRows || (isTrashMode ? trashProjects : activeProjects);
+    if (rowsToExport.length === 0) {
       showToast({
         type: "error",
         title: "Export Gagal",
-        description: "Tidak ada data proyek aktif untuk diekspor.",
+        description: "Tidak ada data proyek yang ditampilkan untuk diekspor.",
       });
       return;
     }
     try {
       const { exportProjectsToExcel } = await import("@/lib/exportUtils");
-      await exportProjectsToExcel(activeProjects);
+      await exportProjectsToExcel(rowsToExport, {
+        columns: visibleColumns,
+        isTrashView: isTrashMode,
+      });
       showToast({
         type: "success",
         title: "Export Berhasil",
