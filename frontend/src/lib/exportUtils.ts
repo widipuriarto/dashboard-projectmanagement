@@ -179,6 +179,98 @@ export function buildDenormalizedExportRows(
 }
 
 /**
+ * Formats row item fields for export (SLA calculation, boolean normalization, dates, and currencies).
+ */
+export function formatRowValues(
+  item: Record<string, unknown>,
+  activeColumns: ExportColumnDef[],
+  isTrashView?: boolean
+): Record<string, unknown> {
+  const rowObj: Record<string, unknown> = {};
+
+  for (const col of activeColumns) {
+    const key = col.key;
+    let val = item[key];
+
+    // Handle accessorKey fallback for sla_bast
+    if (val === undefined && key === "sla_bast") {
+      val = item["waktu_penyelesaian_bast"];
+    }
+
+    // Compute SLA difference dynamically if not pre-calculated
+    if ((key === "sla_bast" || key === "waktu_penyelesaian_bast") && val == null) {
+      if (item.tanggal_request_dr && item.tanggal_close_dr) {
+        const d1 = new Date(String(item.tanggal_request_dr));
+        const d2 = new Date(String(item.tanggal_close_dr));
+        if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
+          val = Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
+        }
+      }
+    }
+
+    // Normalize boolean/status values for status_email_handover
+    if (key === "status_email_handover") {
+      if (val === true || String(val).toLowerCase() === "true") val = "OK";
+      else if (val === false || String(val).toLowerCase() === "false") val = "NOK";
+    }
+
+    // Normalize boolean/status values for hardfile_bast
+    if (key === "hardfile_bast") {
+      if (val === true || String(val).toLowerCase() === "true") val = "ADA";
+      else if (val === false || String(val).toLowerCase() === "false") val = "TIDAK ADA";
+    }
+
+    // Numeric parsing for contract value
+    if (key === "nilai_kontrak_obl") {
+      const num = typeof val === "number" ? val : parseFloat(String(val));
+      val = !isNaN(num) ? num : null;
+    }
+
+    // Clean date values to YYYY-MM-DD
+    if (
+      (key === "tgl_kontrak" ||
+        key === "tanggal_request_dr" ||
+        key === "tanggal_close_dr" ||
+        key === "tanggal_bast") &&
+      val
+    ) {
+      val = String(val).split("T")[0];
+    }
+
+    // Month-Year localized representation
+    if ((key === "bulan_bc" || key === "komitmen_bc") && val) {
+      val = formatMonthYearKey(String(val));
+    }
+
+    // Datetime formatting for created_at and updated_at
+    if ((key === "created_at" || key === "updated_at") && val) {
+      val = formatDateTime(String(val));
+    }
+
+    // In trash view, map updated_at to deleted_at timestamp
+    if (key === "updated_at" && isTrashView) {
+      val = item.deleted_at ? formatDateTime(String(item.deleted_at)) : val;
+    }
+
+    rowObj[key] = val != null ? val : "";
+  }
+
+  return rowObj;
+}
+
+/**
+ * Escapes a cell value conforming to RFC 4180 standard for CSV.
+ */
+export function escapeCsvCell(val: unknown): string {
+  if (val == null) return "";
+  const str = String(val);
+  if (str.includes('"') || str.includes(",") || str.includes("\n") || str.includes("\r")) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
+/**
  * Applies corporate styling, header design, borders, and number formats to worksheet.
  */
 function applyWorksheetStyles(
@@ -327,75 +419,9 @@ export async function exportProjectsToExcel(
     key: col.key,
   }));
 
-  // 2. Add data rows
+  // 2. Add formatted data rows
   for (const item of denormalizedRows) {
-    const rowObj: Record<string, unknown> = {};
-    for (const col of activeColumns) {
-      const key = col.key;
-      let val = item[key];
-
-      // Handle accessorKey fallback for sla_bast
-      if (val === undefined && key === "sla_bast") {
-        val = item["waktu_penyelesaian_bast"];
-      }
-
-      // Compute SLA difference dynamically if not pre-calculated
-      if ((key === "sla_bast" || key === "waktu_penyelesaian_bast") && val == null) {
-        if (item.tanggal_request_dr && item.tanggal_close_dr) {
-          const d1 = new Date(String(item.tanggal_request_dr));
-          const d2 = new Date(String(item.tanggal_close_dr));
-          if (!isNaN(d1.getTime()) && !isNaN(d2.getTime())) {
-            val = Math.ceil(Math.abs(d2.getTime() - d1.getTime()) / (1000 * 60 * 60 * 24));
-          }
-        }
-      }
-
-      // Normalize boolean/status values for status_email_handover
-      if (key === "status_email_handover") {
-        if (val === true || String(val).toLowerCase() === "true") val = "OK";
-        else if (val === false || String(val).toLowerCase() === "false") val = "NOK";
-      }
-
-      // Normalize boolean/status values for hardfile_bast
-      if (key === "hardfile_bast") {
-        if (val === true || String(val).toLowerCase() === "true") val = "ADA";
-        else if (val === false || String(val).toLowerCase() === "false") val = "TIDAK ADA";
-      }
-
-      // Numeric parsing for contract value
-      if (key === "nilai_kontrak_obl") {
-        const num = typeof val === "number" ? val : parseFloat(String(val));
-        val = !isNaN(num) ? num : null;
-      }
-
-      // Clean date values to YYYY-MM-DD
-      if (
-        (key === "tgl_kontrak" ||
-          key === "tanggal_request_dr" ||
-          key === "tanggal_close_dr" ||
-          key === "tanggal_bast") &&
-        val
-      ) {
-        val = String(val).split("T")[0];
-      }
-
-      // Month-Year localized representation
-      if ((key === "bulan_bc" || key === "komitmen_bc") && val) {
-        val = formatMonthYearKey(String(val));
-      }
-
-      // Datetime formatting for created_at and updated_at
-      if ((key === "created_at" || key === "updated_at") && val) {
-        val = formatDateTime(String(val));
-      }
-
-      // In trash view, map updated_at to deleted_at timestamp
-      if (key === "updated_at" && options?.isTrashView) {
-        val = item.deleted_at ? formatDateTime(String(item.deleted_at)) : val;
-      }
-
-      rowObj[key] = val != null ? val : "";
-    }
+    const rowObj = formatRowValues(item, activeColumns, options?.isTrashView);
     worksheet.addRow(rowObj);
   }
 
@@ -407,6 +433,69 @@ export async function exportProjectsToExcel(
   const buffer = await workbook.xlsx.writeBuffer();
   const blob = new Blob([buffer], {
     type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  });
+
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.setAttribute("href", url);
+  link.setAttribute("download", defaultFilename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Exports project records to standard comma-separated values (.csv) format
+ * matching the current table view (visible columns, column ordering, filters, search, and sorting)
+ * with RFC 4180 escaping and UTF-8 BOM encoding for Microsoft Excel compatibility.
+ */
+export function exportProjectsToCsv(
+  projects: ProjectPM[],
+  options?: ExportProjectsOptions
+): void {
+  const activeColumns: ExportColumnDef[] =
+    options?.columns && options.columns.length > 0
+      ? options.columns
+      : EXPORT_COLUMN_KEYS.map((key) => ({
+          key,
+          header: EXPORT_COLUMN_HEADERS[key] || key,
+        }));
+
+  const activeKeys = activeColumns.map((c) => c.key);
+  const denormalizedRows = buildDenormalizedExportRows(projects, activeKeys);
+
+  const defaultFilename =
+    options?.filename ||
+    `Projects_PM_Export_${new Date().toISOString().slice(0, 10)}.csv`;
+
+  // 1. Build Header line with active columns
+  const headerLine = activeColumns
+    .map((col) => escapeCsvCell(col.header))
+    .join(",");
+
+  // 2. Build Data lines matching visible column order
+  const dataLines = denormalizedRows.map((item) => {
+    const formattedRow = formatRowValues(item, activeColumns, options?.isTrashView);
+    return activeColumns
+      .map((col) => {
+        let val = formattedRow[col.key];
+        if (
+          (col.key === "sla_bast" || col.key === "waktu_penyelesaian_bast") &&
+          typeof val === "number"
+        ) {
+          val = `${val} Hari`;
+        }
+        return escapeCsvCell(val);
+      })
+      .join(",");
+  });
+
+  const csvContent = [headerLine, ...dataLines].join("\r\n");
+
+  // 3. UTF-8 BOM (\uFEFF) ensures proper character rendering in Microsoft Excel & text editors
+  const blob = new Blob(["\uFEFF" + csvContent], {
+    type: "text/csv;charset=utf-8;",
   });
 
   const url = URL.createObjectURL(blob);

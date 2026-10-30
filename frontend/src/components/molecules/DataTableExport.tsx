@@ -12,15 +12,15 @@ import { cn } from "@/lib/utils";
 interface DataTableExportProps {
   className?: string;
   disabled?: boolean;
+  onExportCsv?: () => void;
   onExportExcel?: () => void;
-  onExportPdf?: () => void;
 }
 
 export function DataTableExport({
   className,
   disabled = false,
+  onExportCsv,
   onExportExcel,
-  onExportPdf,
 }: DataTableExportProps) {
   const [isOpen, setIsOpen] = React.useState(false);
 
@@ -81,6 +81,28 @@ export function DataTableExport({
         sideOffset={6}
         className="w-56 p-1.5 shadow-md border border-telkom-navy ring-0 rounded-md bg-white"
       >
+        {/* Row 1: CSV Export */}
+        <DropdownMenuItem
+          data-testid="export-csv-option"
+          onClick={onExportCsv}
+          className="cursor-pointer py-2 px-2.5 rounded-md text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100 flex items-center gap-2.5 transition-colors focus:[--accent-foreground:inherit]"
+        >
+          <div className="h-7 w-7 rounded-md bg-blue-50 !text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
+            <span className="material-symbols-outlined text-[18px] leading-none select-none !text-blue-600">
+              csv
+            </span>
+          </div>
+          <div className="flex flex-col text-left">
+            <span className="!text-slate-800 font-semibold leading-tight text-xs sm:text-sm">
+              Export CSV
+            </span>
+            <span className="text-[10px] !text-slate-400 leading-tight">
+              Comma-separated (.csv)
+            </span>
+          </div>
+        </DropdownMenuItem>
+
+        {/* Row 2: Excel Export */}
         <DropdownMenuItem
           data-testid="export-excel-option"
           onClick={onExportExcel}
@@ -97,26 +119,6 @@ export function DataTableExport({
             </span>
             <span className="text-[10px] !text-slate-400 leading-tight">
               Spreadsheet (.xlsx)
-            </span>
-          </div>
-        </DropdownMenuItem>
-
-        <DropdownMenuItem
-          data-testid="export-pdf-option"
-          onClick={onExportPdf}
-          className="cursor-pointer py-2 px-2.5 rounded-md text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-100 focus:bg-slate-100 flex items-center gap-2.5 transition-colors focus:[--accent-foreground:inherit]"
-        >
-          <div className="h-7 w-7 rounded-md bg-red-50 !text-telkom-red border border-red-100 flex items-center justify-center shrink-0">
-            <span className="material-symbols-outlined text-[18px] leading-none select-none !text-telkom-red">
-              picture_as_pdf
-            </span>
-          </div>
-          <div className="flex flex-col text-left">
-            <span className="!text-slate-800 font-semibold leading-tight text-xs sm:text-sm">
-              Export PDF
-            </span>
-            <span className="text-[10px] !text-slate-400 leading-tight">
-              Document (.pdf)
             </span>
           </div>
         </DropdownMenuItem>

@@ -423,6 +423,40 @@ export default function Repository() {
     }
   };
 
+  const handleExportCsv = async (
+    displayedRows?: ProjectPM[],
+    visibleColumns?: Array<{ key: string; header: string }>
+  ) => {
+    const rowsToExport = displayedRows || (isTrashMode ? trashProjects : activeProjects);
+    if (rowsToExport.length === 0) {
+      showToast({
+        type: "error",
+        title: "Export Gagal",
+        description: "Tidak ada data proyek yang ditampilkan untuk diekspor.",
+      });
+      return;
+    }
+    try {
+      const { exportProjectsToCsv } = await import("@/lib/exportUtils");
+      exportProjectsToCsv(rowsToExport, {
+        columns: visibleColumns,
+        isTrashView: isTrashMode,
+      });
+      showToast({
+        type: "success",
+        title: "Export Berhasil",
+        description: "File CSV (.csv) berhasil diunduh.",
+      });
+    } catch (err: unknown) {
+      console.error("Failed to export CSV file:", err);
+      showToast({
+        type: "error",
+        title: "Export Gagal",
+        description: "Terjadi kesalahan saat memproses file CSV.",
+      });
+    }
+  };
+
   return (
     <div className="flex flex-col space-y-4 md:space-y-6 h-full overflow-hidden">
       {/* Page Header */}
@@ -449,6 +483,7 @@ export default function Repository() {
           onPermanentDelete={handleDeleteClick}
           onTrashClick={handleTrashClick}
           onExportExcel={handleExportExcel}
+          onExportCsv={handleExportCsv}
           createFormSlot={
             <ProjectForm
               ref={projectFormRef}

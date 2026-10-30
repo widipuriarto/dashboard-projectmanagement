@@ -67,7 +67,10 @@ interface DataTableProps<TData, TValue> {
     rows: TData[],
     visibleColumns: Array<{ key: string; header: string }>
   ) => void;
-  onExportPdf?: () => void;
+  onExportCsv?: (
+    rows: TData[],
+    visibleColumns: Array<{ key: string; header: string }>
+  ) => void;
 }
 
 const EMPTY_SORTING: SortingState = [];
@@ -89,7 +92,7 @@ export function DataTable<TData, TValue>({
   onPermanentDelete,
   onTrashClick,
   onExportExcel,
-  onExportPdf,
+  onExportCsv,
 }: DataTableProps<TData, TValue>) {
   const isFormActive = isFormMode ?? isCreateMode;
   const [sorting, setSorting] = React.useState<SortingState>(() => {
@@ -528,6 +531,19 @@ export function DataTable<TData, TValue>({
     onExportExcel?.(displayedRows, visibleColumns);
   }, [table, isTrashMode, onExportExcel]);
 
+  const handleExportCsvClick = React.useCallback(() => {
+    const displayedRows = table.getRowModel().rows.map((r) => r.original);
+    const visibleColumns = table
+      .getVisibleLeafColumns()
+      .filter((col) => col.id !== "actions")
+      .map((col) => ({
+        key: col.id,
+        header: getColumnDisplayTitle(col.id, isTrashMode),
+      }));
+
+    onExportCsv?.(displayedRows, visibleColumns);
+  }, [table, isTrashMode, onExportCsv]);
+
   return (
     <div className="space-y-4 flex flex-col flex-1 min-h-0">
       {/* Responsive Table Toolbar */}
@@ -552,7 +568,7 @@ export function DataTable<TData, TValue>({
               className="w-full px-1 sm:px-2"
               disabled={isFormActive || isTrashMode}
               onExportExcel={handleExportExcelClick}
-              onExportPdf={onExportPdf}
+              onExportCsv={handleExportCsvClick}
             />
           </div>
           <div className="w-full">
@@ -610,7 +626,7 @@ export function DataTable<TData, TValue>({
             <DataTableExport
               disabled={isFormActive || isTrashMode}
               onExportExcel={handleExportExcelClick}
-              onExportPdf={onExportPdf}
+              onExportCsv={handleExportCsvClick}
             />
             <Button
               data-testid="trash-button"
